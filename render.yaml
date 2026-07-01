@@ -5,7 +5,7 @@ services:
     plan: starter
     buildCommand: npm install
     preDeployCommand: npm run migrate && npm run seed
-    startCommand: node scripts/patch-pwa-ui-safe.js && node scripts/patch-approval-subscription-link.js && node scripts/start-stable.js
+    startCommand: node scripts/patch-pwa-ui-safe.js && node scripts/patch-approval-subscription-link.js && node scripts/patch-subscription-webhook-safe.js && node scripts/start-stable.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
