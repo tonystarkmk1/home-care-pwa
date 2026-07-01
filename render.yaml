@@ -5,7 +5,7 @@ services:
     plan: starter
     buildCommand: npm install
     preDeployCommand: npm run migrate && npm run seed
-    startCommand: node scripts/patch-onboarding.js && node scripts/patch-auth-contacts-server.js && node scripts/patch-auth-contacts-ui.js && node scripts/start-stripe-fixed.js
+    startCommand: node scripts/patch-onboarding.js && node scripts/patch-auth-contacts-server.js && node scripts/patch-auth-contacts-ui.js && node scripts/patch-pwa-localita.js && node scripts/start-stripe-fixed.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
