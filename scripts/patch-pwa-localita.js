@@ -32,8 +32,7 @@ if (!html.includes('let deferredInstallPrompt')) {
     "}",
   ].join('\n') + '\n';
   html = html.replace('async function boot()', installCode + 'async function boot()');
-}
-html = html.replace("class=\"btn ${id==='base'?'gold':'teal'}\"", "class=\"btn teal\"");
+}\nhtml = html.replace("class=\"btn ${id==='base'?'gold':'teal'}\"", "class=\"btn teal\"");
 html = html.replace("<button class=\"btn light small\" onclick=\"authView('login')\">Accedi</button>", "<button class=\"btn light small\" onclick=\"installApp()\">Installa app</button> <button class=\"btn light small\" onclick=\"authView('login')\">Accedi</button>");
 html = html.replace("<button class=\"btn light small\" onclick=\"logout()\">Esci</button>", "<button class=\"btn light small\" onclick=\"installApp()\">Installa app</button> <button class=\"btn light small\" onclick=\"logout()\">Esci</button>");
 
@@ -84,7 +83,7 @@ const approveRoute = `app.post('/api/admin/properties/:id/approve', auth(), admi
       await q('UPDATE customers SET stripe_customer_id=$2,updated_at=NOW() WHERE id=$1', [customer.id, stripeCustomerId]);
     }
     payment = (await q('INSERT INTO extra_payments(customer_id,amount_cents,description,status) VALUES($1,$2,$3,$4) RETURNING *', [row.customer_id, monthlyCents, 'Abbonamento mensile ' + (packages[pkg]?.label || pkg) + ' - ' + row.name, 'pending'])).rows[0];
-    const base = (PUBLIC_URL || appUrl(req)).replace(/\/$/, '');
+    const base = (PUBLIC_URL || appUrl(req)).replace(/\\/$/, '');
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
