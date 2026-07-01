@@ -1,0 +1,2 @@
+-- Per nuovi database il ruolo helper è definito in schema.sql.
+-- Per database già esistenti, aggiornare manualmente il vincolo del ruolo se necessario.
