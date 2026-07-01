@@ -22,12 +22,13 @@ async function main() {
     const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12);
 
     await pool.query(
-      `INSERT INTO users (name, email, password_hash, role)
-       VALUES ($1, $2, $3, 'admin')
+      `INSERT INTO users (name, email, password_hash, role, email_confirmed)
+       VALUES ($1, $2, $3, 'admin', TRUE)
        ON CONFLICT (email) DO UPDATE SET
          name = EXCLUDED.name,
          password_hash = EXCLUDED.password_hash,
          role = 'admin',
+         email_confirmed = TRUE,
          updated_at = NOW()`,
       [name, email, passwordHash]
     );
