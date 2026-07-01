@@ -147,7 +147,7 @@ app.post('/api/admin/extra-payments/:id/cancel', auth(), adminOnly, async (req, 
 app.get('/api/admin/manual-payments', auth(), adminOnly, async (req, res) => res.json({ payments: (await q('SELECT m.*,c.name customer_name FROM manual_payments m JOIN customers c ON c.id=m.customer_id ORDER BY m.created_at DESC LIMIT 100')).rows }));`;
 patch(
   'extra payments routes',
-  /app\.get\('\/api\/admin\/extra-payments',[\s\S]*?app\.get\('\/api\/admin\/manual-payments',[\s\S]*?\n\}\);/,
+  /app\.get\('\/api\/admin\/extra-payments',[\s\S]*?app\.get\('\/api\/admin\/manual-payments',[\s\S]*?\)\);/,
   extraPayments
 );
 
