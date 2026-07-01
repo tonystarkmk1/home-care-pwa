@@ -1,0 +1,17 @@
+{
+  "name": "Home Care PWA",
+  "short_name": "Home Care",
+  "description": "Gestionale Home Care per clienti, immobili, controlli e pagamenti.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f1e8",
+  "theme_color": "#06243a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
