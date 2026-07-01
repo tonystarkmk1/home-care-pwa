@@ -22,6 +22,8 @@ async function main() {
     await pool.query("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'helper', 'client'))");
 
     await pool.query(`
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS current_package_type TEXT;
+      ALTER TABLE manual_payments ADD COLUMN IF NOT EXISTS package_type TEXT;
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS request_status TEXT NOT NULL DEFAULT 'active';
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS property_type TEXT;
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS client_notes TEXT;
@@ -42,6 +44,8 @@ async function main() {
 
       CREATE INDEX IF NOT EXISTS idx_messages_customer_created ON messages(customer_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_properties_request_status ON properties(request_status);
+      CREATE INDEX IF NOT EXISTS idx_customers_current_package ON customers(current_package_type);
+      CREATE INDEX IF NOT EXISTS idx_manual_payments_package ON manual_payments(package_type);
     `);
 
     console.log('Migrazione database completata.');
