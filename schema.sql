@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS customers (
   email TEXT,
   phone TEXT,
   notes TEXT,
+  current_package_type TEXT,
   payment_status TEXT NOT NULL CHECK (payment_status IN ('paid', 'unpaid', 'past_due', 'canceled')) DEFAULT 'unpaid',
   paid_until DATE,
   manual_payment_note TEXT,
@@ -44,6 +45,12 @@ CREATE TABLE IF NOT EXISTS properties (
   monthly_price_cents INTEGER NOT NULL DEFAULT 3900,
   next_check_date DATE NOT NULL DEFAULT CURRENT_DATE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
+  request_status TEXT NOT NULL DEFAULT 'active',
+  property_type TEXT,
+  client_notes TEXT,
+  requested_package_type TEXT,
+  requested_at TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -94,12 +101,25 @@ CREATE TABLE IF NOT EXISTS manual_payments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   amount_cents INTEGER,
+  package_type TEXT,
   method TEXT NOT NULL DEFAULT 'contanti',
   description TEXT,
   paid_until DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  customer_id UUID NOT NULL REFERENCES customers(id),
+  sender_role TEXT NOT NULL CHECK (sender_role IN ('admin', 'client')),
+  sender_name TEXT NOT NULL,
+  body TEXT NOT NULL,
+  read_by_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  read_by_client BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS current_package_type TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS paid_until DATE;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS manual_payment_note TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_manual_payment_at TIMESTAMPTZ;
@@ -109,11 +129,23 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email_confirm_code TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_confirm_expires_at TIMESTAMPTZ;
 UPDATE users SET email_confirmed = TRUE WHERE role IN ('admin', 'helper') AND email_confirmed IS DISTINCT FROM TRUE;
 
+ALTER TABLE manual_payments ADD COLUMN IF NOT EXISTS package_type TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS request_status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS property_type TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS client_notes TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS requested_package_type TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS requested_at TIMESTAMPTZ;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_users_customer_id ON users(customer_id);
 CREATE INDEX IF NOT EXISTS idx_users_email_confirm_code ON users(email_confirm_code);
+CREATE INDEX IF NOT EXISTS idx_customers_current_package ON customers(current_package_type);
 CREATE INDEX IF NOT EXISTS idx_properties_customer_id ON properties(customer_id);
 CREATE INDEX IF NOT EXISTS idx_properties_next_check ON properties(next_check_date);
+CREATE INDEX IF NOT EXISTS idx_properties_request_status ON properties(request_status);
 CREATE INDEX IF NOT EXISTS idx_checks_property_id ON checks(property_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_status ON tasks(status, due_date);
 CREATE INDEX IF NOT EXISTS idx_extra_payments_customer_status ON extra_payments(customer_id, status);
 CREATE INDEX IF NOT EXISTS idx_manual_payments_customer_id ON manual_payments(customer_id);
+CREATE INDEX IF NOT EXISTS idx_manual_payments_package ON manual_payments(package_type);
+CREATE INDEX IF NOT EXISTS idx_messages_customer_created ON messages(customer_id, created_at);
