@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: home-care-pwa
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run migrate && npm run seed
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: home-care-db
+          property: connectionString
+      - key: ADMIN_NAME
+        value: Admin Home Care
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: APP_WHATSAPP
+        value: "80872207"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: UPLOAD_DIR
+        value: uploads
+
+databases:
+  - name: home-care-db
+    plan: starter

@@ -1,0 +1,28 @@
+{
+  "name": "home-care-pwa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PWA gestionale Home Care per clienti, immobili, GPS, controlli, report, dashboard e pagamenti Stripe.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "check": "node --check server.js && node --check scripts/migrate.js && node --check scripts/seed.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^7.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.1",
+    "stripe": "^17.5.0"
+  },
+  "devDependencies": { "nodemon": "^3.1.9" }
+}
