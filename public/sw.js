@@ -1,4 +1,4 @@
-const CACHE_NAME = 'home-care-pwa-v6';
+const CACHE_NAME = 'home-care-pwa-v7';
 const CORE_ASSETS = ['/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
