@@ -5,7 +5,7 @@ services:
     plan: starter
     buildCommand: npm install
     preDeployCommand: npm run migrate && npm run seed
-    startCommand: node scripts/start-stripe.js
+    startCommand: node scripts/start-stripe-fixed.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
