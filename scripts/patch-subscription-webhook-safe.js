@@ -25,6 +25,12 @@ const newWebhook = `app.post('/api/stripe/webhook', express.raw({ type: 'applica
       if (session.metadata && session.metadata.kind === 'subscription' && session.metadata.customerId) {
         await q("UPDATE customers SET payment_status='paid',paid_until=NULL,stripe_customer_id=COALESCE(stripe_customer_id,$2),stripe_subscription_id=COALESCE(stripe_subscription_id,$3),updated_at=NOW() WHERE id=$1", [session.metadata.customerId, session.customer, session.subscription]);
       }
+      if (session.metadata && session.metadata.kind === 'annual_property_payment' && session.metadata.customerId) {
+        await q("UPDATE customers SET payment_status='paid',paid_until=(CURRENT_DATE + INTERVAL '1 year')::date,stripe_customer_id=COALESCE(stripe_customer_id,$2),updated_at=NOW() WHERE id=$1", [session.metadata.customerId, session.customer]);
+      }
+      if (session.metadata && session.metadata.kind === 'extra_payment' && session.metadata.extraPaymentId) {
+        await q("UPDATE extra_payments SET status='paid',paid_at=NOW(),updated_at=NOW() WHERE id=$1", [session.metadata.extraPaymentId]);
+      }
     }
     if (event.type === 'invoice.payment_failed') {
       const invoice = event.data.object;
@@ -41,7 +47,7 @@ if (!code.includes(oldWebhook)) {
   console.warn('Webhook Stripe non trovato o già aggiornato.');
 } else {
   code = code.replace(oldWebhook, newWebhook);
-  console.log('Webhook Stripe aggiornato per abbonamenti mensili.');
+  console.log('Webhook Stripe aggiornato per abbonamenti mensili e pagamenti annuali.');
 }
 
 fs.writeFileSync(serverPath, code);
