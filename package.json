@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "description": "PWA gestionale Home Care per clienti, immobili, GPS, controlli, report, dashboard e pagamenti Stripe.",
-  "main": "server2.js",
+  "main": "server3.js",
   "scripts": {
-    "start": "node scripts/patch-ui.js && node scripts/serve-fixed.js",
-    "dev": "nodemon server2.js",
+    "start": "node server3.js",
+    "dev": "nodemon server3.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "check": "node --check server2.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/serve-fixed.js && node --check scripts/patch-ui.js"
+    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
