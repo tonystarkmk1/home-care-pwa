@@ -22,8 +22,11 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   phone TEXT,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'client')) DEFAULT 'client',
+  role TEXT NOT NULL CHECK (role IN ('admin', 'helper', 'client')) DEFAULT 'client',
   customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  email_confirmed BOOLEAN NOT NULL DEFAULT TRUE,
+  email_confirm_code TEXT,
+  email_confirm_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -97,12 +100,17 @@ CREATE TABLE IF NOT EXISTS manual_payments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Migrazioni leggere per installazioni già esistenti
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS paid_until DATE;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS manual_payment_note TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_manual_payment_at TIMESTAMPTZ;
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_confirmed BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_confirm_code TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_confirm_expires_at TIMESTAMPTZ;
+UPDATE users SET email_confirmed = TRUE WHERE role IN ('admin', 'helper') AND email_confirmed IS DISTINCT FROM TRUE;
+
 CREATE INDEX IF NOT EXISTS idx_users_customer_id ON users(customer_id);
+CREATE INDEX IF NOT EXISTS idx_users_email_confirm_code ON users(email_confirm_code);
 CREATE INDEX IF NOT EXISTS idx_properties_customer_id ON properties(customer_id);
 CREATE INDEX IF NOT EXISTS idx_properties_next_check ON properties(next_check_date);
 CREATE INDEX IF NOT EXISTS idx_checks_property_id ON checks(property_id);
