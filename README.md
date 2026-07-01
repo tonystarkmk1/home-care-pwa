@@ -1,15 +1,15 @@
 # Home Care PWA
 
-PWA gestionale per il servizio Home Care: clienti, immobili, controlli periodici, GPS, mappa, giri di controllo, Stripe e pagamenti manuali.
+PWA gestionale per il servizio Home Care: clienti, immobili, controlli periodici, GPS, giri di controllo, report fotografici, Stripe e pagamenti manuali.
 
-## Funzioni incluse nella prima versione
+## Funzioni incluse
 
 ### Area admin
 
 - Login admin.
 - Scheda cliente.
 - Scheda immobile collegata al cliente.
-- Pacchetto visibile per ogni immobile:
+- Servizio visibile per ogni immobile:
   - Base: 39 €/mese
   - Comfort: 79 €/mese
   - Premium: 199 €/mese
@@ -23,9 +23,8 @@ PWA gestionale per il servizio Home Care: clienti, immobili, controlli periodici
 - GPS al primo controllo:
   - salva posizione attuale dell’immobile;
   - apre rapidamente Google Maps.
-- Mappa con OpenStreetMap/Leaflet.
 - Calcolo giro controlli ordinato per distanza dalla posizione attuale.
-- Checklist diversa in base al pacchetto.
+- Checklist diversa in base al servizio.
 - Report controllo con note e foto.
 - Pagamenti extra/manutenzioni con importo libero tramite Stripe Checkout.
 - Pagamento manuale/annuale:
@@ -40,6 +39,53 @@ PWA gestionale per il servizio Home Care: clienti, immobili, controlli periodici
 - Stato pagamento.
 - Report recenti.
 - Pagamenti extra in sospeso con link pagamento.
+
+## Deploy su Render
+
+Il file `render.yaml` è già pronto per il deploy tramite Blueprint.
+
+### Nota sul piano Render Hobby
+
+Il piano Hobby del tuo account va bene. Nel file `render.yaml` il servizio web usa `plan: starter`, mentre il database usa il nuovo piano Postgres `basic-256mb`, perché i vecchi piani database come `starter` non sono più supportati per nuovi database.
+
+### Variabili da compilare quando Render le chiede
+
+- `Blueprint Name`: `home-care-pwa`
+- `APP_URL`: puoi lasciarlo vuoto al primo deploy e inserirlo dopo, oppure mettere l’URL Render quando lo avrai.
+- `ADMIN_EMAIL`: la tua email admin.
+- `ADMIN_PASSWORD`: password admin iniziale.
+- `STRIPE_SECRET_KEY`: lascia vuoto per il primo test se non vuoi configurare subito Stripe.
+- `STRIPE_WEBHOOK_SECRET`: lascia vuoto per il primo test se non vuoi configurare subito Stripe.
+
+Dopo il primo deploy potrai accedere con `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
+
+## Stripe
+
+Quando vorrai attivare Stripe, imposta il webhook verso:
+
+```text
+https://TUO-DOMINIO-RENDER/api/stripe/webhook
+```
+
+Eventi consigliati:
+
+- `checkout.session.completed`
+- `invoice.paid`
+- `invoice.payment_failed`
+- `customer.subscription.deleted`
+
+## Nota importante sulle foto
+
+La cartella `uploads` salva le foto sul server. Su Render, questa soluzione va bene per una prova, ma per uso reale conviene passare in futuro a un servizio esterno come Cloudinary o S3, così le foto restano salvate anche dopo aggiornamenti o redeploy.
+
+## Logica pagamento/controlli
+
+Un controllo viene considerato eseguibile solo se il cliente è in regola:
+
+- pagamento Stripe attivo, oppure
+- pagamento manuale registrato con data “pagato fino al” non scaduta.
+
+Se il cliente non è in regola, il controllo compare come bloccato e non può essere segnato come completato.
 
 ## Installazione locale
 
@@ -71,43 +117,3 @@ npm start
 ```
 
 Poi apri `http://localhost:3000`.
-
-## Deploy su Render
-
-Nel progetto è incluso `render.yaml`. Puoi caricare questa cartella su GitHub e poi collegare il repository a Render.
-
-Variabili importanti su Render:
-
-- `APP_URL`: URL pubblico dell’app Render.
-- `JWT_SECRET`: stringa segreta lunga.
-- `DATABASE_URL`: collegata al PostgreSQL Render.
-- `ADMIN_EMAIL`: email admin.
-- `ADMIN_PASSWORD`: password admin iniziale.
-- `STRIPE_SECRET_KEY`: chiave segreta Stripe.
-- `STRIPE_WEBHOOK_SECRET`: segreto webhook Stripe.
-
-Dopo il primo deploy, imposta su Stripe il webhook verso:
-
-```text
-https://TUO-DOMINIO-RENDER/api/stripe/webhook
-```
-
-Eventi consigliati:
-
-- `checkout.session.completed`
-- `invoice.paid`
-- `invoice.payment_failed`
-- `customer.subscription.deleted`
-
-## Nota importante sulle foto
-
-La cartella `uploads` salva le foto sul server. Su Render, per conservare le foto nel tempo, conviene aggiungere un Persistent Disk oppure passare in futuro a un servizio esterno come Cloudinary o S3.
-
-## Logica pagamento/controlli
-
-Un controllo viene considerato eseguibile solo se il cliente è in regola:
-
-- pagamento Stripe attivo, oppure
-- pagamento manuale registrato con data “pagato fino al” non scaduta.
-
-Se il cliente non è in regola, il controllo compare come bloccato e non può essere segnato come completato.
