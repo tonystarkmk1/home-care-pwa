@@ -8,12 +8,17 @@ on:
       - 'android/**'
       - '.github/workflows/android-apk.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -35,8 +40,21 @@ jobs:
       - name: Build debug APK
         run: gradle -p android :app:assembleDebug
 
-      - name: Upload APK
+      - name: Copy APK to public download path
+        run: |
+          mkdir -p public
+          cp android/app/build/outputs/apk/debug/app-debug.apk public/home-care.apk
+
+      - name: Commit APK for Render download
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/home-care.apk
+          git commit -m "Update downloadable Home Care Android APK" || echo "No APK changes to commit"
+          git push
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: home-care-android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: public/home-care.apk
