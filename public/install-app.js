@@ -1,6 +1,14 @@
 (function(){
+  function hasSession(){
+    try { return !!localStorage.getItem('hc_token'); } catch(e) { return false; }
+  }
+
   function isStandalone(){
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || /HomeCareAndroid/i.test(navigator.userAgent || '');
+  }
+
+  function shouldHideInstall(){
+    return isStandalone() || hasSession();
   }
 
   var deferredPrompt = null;
@@ -23,7 +31,7 @@
   }
 
   async function handleInstallClick(){
-    if(isStandalone()) { hideInstallButtons(); return; }
+    if(shouldHideInstall()) { hideInstallButtons(); return; }
     window.location.href = '/scarica-android.html';
   }
 
@@ -37,7 +45,7 @@
   }
 
   function showHeaderButton(){
-    if(isStandalone()) return false;
+    if(shouldHideInstall()) return false;
     if(document.getElementById('homecare-install-header') || document.querySelector('.hc-install-direct')) return true;
     var top = document.querySelector('.top');
     if(!top) return false;
@@ -51,7 +59,7 @@
   }
 
   function showFloatingButton(){
-    if(isStandalone()) return;
+    if(shouldHideInstall()) return;
     if(document.getElementById('homecare-install-floating')) return;
 
     var btn = makeButton('homecare-install-floating');
@@ -72,18 +80,18 @@
   }
 
   function showInstallButtons(){
-    if(isStandalone()) { hideInstallButtons(); return; }
+    if(shouldHideInstall()) { hideInstallButtons(); return; }
     var headerOk = showHeaderButton();
     if(!headerOk) showFloatingButton();
   }
 
   function init(){
-    if(isStandalone()) { hideInstallButtons(); return; }
+    if(shouldHideInstall()) { hideInstallButtons(); return; }
     showInstallButtons();
     var tries = 0;
     var timer = setInterval(function(){
       tries += 1;
-      if(isStandalone()) { hideInstallButtons(); clearInterval(timer); return; }
+      if(shouldHideInstall()) { hideInstallButtons(); clearInterval(timer); return; }
       showInstallButtons();
       if(tries >= 10 || document.getElementById('homecare-install-header') || document.querySelector('.hc-install-direct')) clearInterval(timer);
     }, 700);
