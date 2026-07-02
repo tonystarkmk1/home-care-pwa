@@ -12,29 +12,39 @@ if (!html.includes('apple-mobile-web-app-capable')) {
   );
 }
 
-// Funzione installazione: su Android scarica l'APK vero; su altri browser prova PWA nativa; su iPhone dà istruzioni.
-if (!html.includes('let deferredInstallPrompt')) {
+// Funzione installazione: se l'app è già installata il pulsante viene nascosto.
+if (!html.includes('function isHomeCareInstalled')) {
   const installCode = [
     'let deferredInstallPrompt=null;',
     "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredInstallPrompt=e});",
+    'function isHomeCareInstalled(){',
+    "  const ua=navigator.userAgent||'';",
+    "  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true || /HomeCareAndroid/i.test(ua) || (/; wv\)/i.test(ua)&&location.hostname.indexOf('homecarebadesi.com')>-1);",
+    '}',
+    'function installButtonStyle(){return isHomeCareInstalled()?\'style="display:none"\':\'\'}',
+    'function hideInstallButtons(){if(isHomeCareInstalled())document.querySelectorAll(\'[data-install-app]\').forEach(function(b){b.style.display=\'none\'});}',
+    "window.addEventListener('appinstalled',hideInstallButtons);",
+    "document.addEventListener('DOMContentLoaded',hideInstallButtons);",
     'async function installApp(){',
+    '  if(isHomeCareInstalled())return;',
     "  const ua=navigator.userAgent||'';",
     "  if(/Android/i.test(ua)){ location.href='/scarica-android.html'; return; }",
-    '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;return}',
+    '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;hideInstallButtons();return}',
     "  alert('Su iPhone apri il sito da Safari, premi Condividi e scegli Aggiungi a schermata Home.');",
     '}',
   ].join('\n') + '\n';
   html = html.replace('async function boot()', installCode + 'async function boot()');
 }
 
-// Se una versione precedente della funzione è già stata inserita, la riscriviamo dando priorità all'APK Android.
+// Se una versione precedente della funzione era già stata inserita, la riscriviamo.
 html = html.replace(
   /async function installApp\(\)\{[\s\S]*?\n\}/,
   [
     'async function installApp(){',
+    '  if(isHomeCareInstalled())return;',
     "  const ua=navigator.userAgent||'';",
     "  if(/Android/i.test(ua)){ location.href='/scarica-android.html'; return; }",
-    '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;return}',
+    '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;hideInstallButtons();return}',
     "  alert('Su iPhone apri il sito da Safari, premi Condividi e scegli Aggiungi a schermata Home.');",
     '}'
   ].join('\n')
@@ -43,15 +53,18 @@ html = html.replace(
 // Colore unico per tutti i pulsanti “Richiedi questo servizio”.
 html = html.replace("class=\"btn ${id==='base'?'gold':'teal'}\"", "class=\"btn teal\"");
 
-// Pulsante installa app nella barra pubblica e privata.
+// Rimuove eventuali vecchi pulsanti installa e aggiunge quelli nuovi, nascosti se già installata.
+html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
+html = html.replace(/<button data-install-app class="btn light small"[^>]*onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
+
 html = html.replace(
   '<button class="btn light small" onclick="authView(\'login\')">Accedi</button>',
-  '<button class="btn light small" onclick="installApp()">Installa app</button> <button class="btn light small" onclick="authView(\'login\')">Accedi</button>'
+  '<button data-install-app class="btn light small" ${installButtonStyle()} onclick="installApp()">Installa app</button> <button class="btn light small" onclick="authView(\'login\')">Accedi</button>'
 );
 html = html.replace(
   '<button class="btn light small" onclick="logout()">Esci</button>',
-  '<button class="btn light small" onclick="installApp()">Installa app</button> <button class="btn light small" onclick="logout()">Esci</button>'
+  '<button data-install-app class="btn light small" ${installButtonStyle()} onclick="installApp()">Installa app</button> <button class="btn light small" onclick="logout()">Esci</button>'
 );
 
 fs.writeFileSync(indexPath, html);
-console.log('Installazione Android APK prioritaria, PWA/iOS e colore pulsanti aggiornati.');
+console.log('Installazione Android/PWA aggiornata: pulsante nascosto quando app già installata.');
