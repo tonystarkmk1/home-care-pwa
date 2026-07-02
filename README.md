@@ -1,67 +1,95 @@
 # Home Care PWA
 
-PWA gestionale per il servizio Home Care: clienti, immobili, controlli periodici, GPS, giri di controllo, report fotografici, Stripe e pagamenti manuali.
+PWA gestionale per il servizio Home Care: clienti, immobili, controlli periodici, GPS, giri di controllo, report fotografici, Stripe, pagamenti manuali e comunicazioni cliente/admin.
 
 ## Funzioni incluse
 
 ### Area admin
 
 - Login admin.
-- Scheda cliente.
-- Scheda immobile collegata al cliente.
-- Servizio visibile per ogni immobile:
+- Gestione clienti, immobili e aiutanti.
+- Dashboard con richieste immobili, controlli da fare, controlli bloccati per pagamento non regolare e cose da fare.
+- Servizi visibili per ogni immobile:
   - Base: 39 €/mese
   - Comfort: 79 €/mese
   - Premium: 199 €/mese
   - Villa & Giardino: da 300 €/mese
   - Località Limitrofe: da 150 €/mese
-- Dashboard con:
-  - controlli da fare;
-  - controlli bloccati per pagamento non regolare;
-  - cose da fare;
-  - pagamenti extra da incassare.
-- GPS al primo controllo:
-  - salva posizione attuale dell’immobile;
-  - apre rapidamente Google Maps.
+- Salvataggio GPS dell'immobile e apertura rapida su Google Maps.
 - Calcolo giro controlli ordinato per distanza dalla posizione attuale.
 - Checklist diversa in base al servizio.
 - Report controllo con note e foto.
-- Pagamenti extra/manutenzioni con importo libero tramite Stripe Checkout.
-- Pagamento manuale/annuale:
-  - segna il cliente come pagato;
-  - imposta la data “pagato fino al”;
-  - utile per contanti, bonifico o pagamento anticipato annuale.
+- Pagamenti extra/manutenzioni e registrazione pagamenti manuali.
 
 ### Area cliente
 
-- Login cliente generato dall’admin.
-- Visualizzazione immobili.
-- Stato pagamento.
-- Report recenti.
-- Pagamenti extra in sospeso con link pagamento.
+- Registrazione cliente con conferma email.
+- Inserimento immobili da affidare a Home Care.
+- Visualizzazione stato pagamento, immobili, report e pagamenti extra.
+- Chat Home Care cliente/admin.
 
 ## Deploy su Render
 
-Il file `render.yaml` è già pronto per il deploy tramite Blueprint.
+Il repo contiene un `render.yaml` pronto per il deploy tramite Blueprint.
 
-### Nota sul piano Render Hobby
+La configurazione crea:
 
-Il piano Hobby del tuo account va bene. Nel file `render.yaml` il servizio web usa `plan: starter`, mentre il database usa il nuovo piano Postgres `basic-256mb`, perché i vecchi piani database come `starter` non sono più supportati per nuovi database.
+- un Web Service Node (`home-care-pwa`);
+- un database Render Postgres (`home-care-db`);
+- `DATABASE_URL` collegata automaticamente al database;
+- migrazioni e seed admin eseguiti nel `preDeployCommand`;
+- start stabile con `npm start`.
 
-### Variabili da compilare quando Render le chiede
+### Passi
 
-- `Blueprint Name`: `home-care-pwa`
-- `APP_URL`: puoi lasciarlo vuoto al primo deploy e inserirlo dopo, oppure mettere l’URL Render quando lo avrai.
-- `ADMIN_EMAIL`: la tua email admin.
-- `ADMIN_PASSWORD`: password admin iniziale.
-- `STRIPE_SECRET_KEY`: lascia vuoto per il primo test se non vuoi configurare subito Stripe.
-- `STRIPE_WEBHOOK_SECRET`: lascia vuoto per il primo test se non vuoi configurare subito Stripe.
+1. Vai su Render e scegli **New > Blueprint**.
+2. Collega questo repository GitHub.
+3. Quando Render chiede le variabili `sync: false`, compila almeno:
+   - `ADMIN_EMAIL`: email admin iniziale;
+   - `ADMIN_PASSWORD`: password admin iniziale.
+4. Puoi lasciare vuote al primo test:
+   - `APP_URL`;
+   - `STRIPE_SECRET_KEY`;
+   - `STRIPE_WEBHOOK_SECRET`;
+   - `BREVO_API_KEY`;
+   - `BREVO_SENDER_EMAIL`.
+5. Avvia il Blueprint.
+6. A deploy concluso, apri l'URL `onrender.com` del servizio e accedi con `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
 
-Dopo il primo deploy potrai accedere con `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
+### Comandi usati da Render
+
+```bash
+npm install && npm run check
+npm run predeploy
+npm start
+```
+
+`npm run predeploy` esegue:
+
+```bash
+npm run migrate && npm run seed
+```
+
+## Variabili ambiente
+
+| Variabile | Obbligatoria | Note |
+| --- | --- | --- |
+| `NODE_ENV` | Sì | Su Render è `production`. |
+| `DATABASE_URL` | Sì | Inserita automaticamente dal Blueprint tramite Render Postgres. |
+| `JWT_SECRET` | Sì | Generata automaticamente da Render. |
+| `ADMIN_EMAIL` | Sì | Email admin iniziale. |
+| `ADMIN_PASSWORD` | Sì | Password admin iniziale. |
+| `APP_URL` | No | Puoi impostarla dopo il primo deploy con l'URL Render o il dominio. |
+| `STRIPE_SECRET_KEY` | No | Necessaria solo per attivare Stripe. |
+| `STRIPE_WEBHOOK_SECRET` | No | Necessaria solo per verificare i webhook Stripe. |
+| `BREVO_API_KEY` | No | Necessaria solo per inviare email reali. |
+| `BREVO_SENDER_EMAIL` | No | Mittente email Brevo. |
+| `BREVO_SENDER_NAME` | No | Default: `Home Care`. |
+| `UPLOAD_DIR` | Sì | Default: `uploads`. |
 
 ## Stripe
 
-Quando vorrai attivare Stripe, imposta il webhook verso:
+Quando vuoi attivare Stripe, imposta il webhook verso:
 
 ```text
 https://TUO-DOMINIO-RENDER/api/stripe/webhook
@@ -76,22 +104,13 @@ Eventi consigliati:
 
 ## Nota importante sulle foto
 
-La cartella `uploads` salva le foto sul server. Su Render, questa soluzione va bene per una prova, ma per uso reale conviene passare in futuro a un servizio esterno come Cloudinary o S3, così le foto restano salvate anche dopo aggiornamenti o redeploy.
-
-## Logica pagamento/controlli
-
-Un controllo viene considerato eseguibile solo se il cliente è in regola:
-
-- pagamento Stripe attivo, oppure
-- pagamento manuale registrato con data “pagato fino al” non scaduta.
-
-Se il cliente non è in regola, il controllo compare come bloccato e non può essere segnato come completato.
+La cartella `uploads` salva le foto sul filesystem del servizio. Su Render va bene per una prova, ma per uso reale conviene passare in futuro a un servizio esterno come Cloudinary o S3, così le foto restano salvate anche dopo aggiornamenti o redeploy.
 
 ## Installazione locale
 
 1. Installa Node.js 20 o superiore.
 2. Crea un database PostgreSQL.
-3. Copia il file `.env.example` in `.env` e modifica i valori.
+3. Copia `.env.example` in `.env` e modifica i valori.
 4. Installa le dipendenze:
 
 ```bash
@@ -104,7 +123,7 @@ npm install
 npm run migrate
 ```
 
-6. Crea l’utente admin iniziale:
+6. Crea l'utente admin iniziale:
 
 ```bash
 npm run seed
