@@ -23,29 +23,26 @@ try {
   // Colore unico per tutti i pulsanti “Richiedi questo servizio”.
   html = html.replace("class=\"btn ${id==='base'?'gold':'teal'}\"", "class=\"btn teal\"");
 
-  // Rimuove eventuali vecchie iniezioni del pulsante per evitare duplicati.
+  // Rimuove tutte le vecchie iniezioni del pulsante per evitare duplicati e per non mostrarlo nell'area privata.
   html = html.replace(/<button class="btn light small hc-install-direct"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button data-install-app class="btn light small"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
 
+  // Pulsante installa SOLO nella barra pubblica, accanto ad Accedi.
   const installBtn = '<button class="btn light small hc-install-direct" onclick="location.href=\'/scarica-android.html\'">Installa app</button> ';
   html = html.replace(
     '<button class="btn light small" onclick="authView(\'login\')">Accedi</button>',
     installBtn + '<button class="btn light small" onclick="authView(\'login\')">Accedi</button>'
   );
-  html = html.replace(
-    '<button class="btn light small" onclick="logout()">Esci</button>',
-    installBtn + '<button class="btn light small" onclick="logout()">Esci</button>'
-  );
 
   if (!html.includes('/install-app.js')) {
-    html = html.replace('</body></html>', '<script src="/install-app.js?v=20"></script></body></html>');
+    html = html.replace('</body></html>', '<script src="/install-app.js?v=21"></script></body></html>');
   } else {
-    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=20');
+    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=21');
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: pulsante installa diretto, icone PWA e colori applicati.');
+  console.log('Avvio stabile: installa solo pubblico, icone PWA e colori applicati.');
 } catch (error) {
   console.warn('Patch install app non applicata:', error.message);
 }
