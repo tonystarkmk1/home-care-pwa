@@ -5,7 +5,7 @@ services:
     plan: starter
     buildCommand: npm install
     preDeployCommand: npm run migrate && npm run seed
-    startCommand: node scripts/generate-pwa-png-icons.js && node scripts/patch-pwa-ui-safe.js && node scripts/patch-approval-subscription-link.js && node scripts/patch-subscription-webhook-safe.js && node scripts/patch-client-subscription-route.js && node scripts/patch-client-property-pay-ui.js && node scripts/patch-dashboard-clickable.js && node scripts/start-stable.js
+    startCommand: node scripts/start-stable.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -21,6 +21,8 @@ services:
       - key: ADMIN_NAME
         value: Admin Home Care
       - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
