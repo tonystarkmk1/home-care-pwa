@@ -24,8 +24,6 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
       - key: APP_WHATSAPP
         value: "80872207"
       - key: STRIPE_SECRET_KEY
