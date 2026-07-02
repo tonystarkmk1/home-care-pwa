@@ -20,16 +20,32 @@ try {
     );
   }
 
+  // Colore unico per tutti i pulsanti “Richiedi questo servizio”.
   html = html.replace("class=\"btn ${id==='base'?'gold':'teal'}\"", "class=\"btn teal\"");
 
+  // Rimuove eventuali vecchie iniezioni del pulsante per evitare duplicati.
+  html = html.replace(/<button class="btn light small hc-install-direct"[^>]*>Installa app<\/button>\s*/g, '');
+  html = html.replace(/<button data-install-app class="btn light small"[^>]*>Installa app<\/button>\s*/g, '');
+  html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
+
+  const installBtn = '<button class="btn light small hc-install-direct" onclick="location.href=\'/scarica-android.html\'">Installa app</button> ';
+  html = html.replace(
+    '<button class="btn light small" onclick="authView(\'login\')">Accedi</button>',
+    installBtn + '<button class="btn light small" onclick="authView(\'login\')">Accedi</button>'
+  );
+  html = html.replace(
+    '<button class="btn light small" onclick="logout()">Esci</button>',
+    installBtn + '<button class="btn light small" onclick="logout()">Esci</button>'
+  );
+
   if (!html.includes('/install-app.js')) {
-    html = html.replace('</body></html>', '<script src="/install-app.js?v=10"></script></body></html>');
+    html = html.replace('</body></html>', '<script src="/install-app.js?v=20"></script></body></html>');
   } else {
-    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=10');
+    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=20');
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: install button script, icone PWA e colori applicati.');
+  console.log('Avvio stabile: pulsante installa diretto, icone PWA e colori applicati.');
 } catch (error) {
   console.warn('Patch install app non applicata:', error.message);
 }
