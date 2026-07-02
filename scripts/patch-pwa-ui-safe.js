@@ -12,14 +12,16 @@ if (!html.includes('apple-mobile-web-app-capable')) {
   );
 }
 
-// Funzione installazione PWA: Chrome/Android mostra il prompt, iPhone usa il menu Condividi.
+// Funzione installazione: prova PWA nativa; su Android offre APK vero; su iPhone dà istruzioni.
 if (!html.includes('let deferredInstallPrompt')) {
   const installCode = [
     'let deferredInstallPrompt=null;',
     "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredInstallPrompt=e});",
     'async function installApp(){',
     '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;return}',
-    "  alert('Per installare Home Care usa il menu del browser e scegli Aggiungi a schermata Home o Installa app.');",
+    "  const ua=navigator.userAgent||'';",
+    "  if(/Android/i.test(ua)){ if(confirm('Vuoi scaricare la versione Android installabile di Home Care?')) location.href='/scarica-android.html'; return; }",
+    "  alert('Su iPhone apri il sito da Safari, premi Condividi e scegli Aggiungi a schermata Home.');",
     '}',
   ].join('\n') + '\n';
   html = html.replace('async function boot()', installCode + 'async function boot()');
@@ -39,4 +41,4 @@ html = html.replace(
 );
 
 fs.writeFileSync(indexPath, html);
-console.log('PWA installabile con PNG e colore pulsanti piani aggiornati.');
+console.log('PWA/APK installabile con PNG e colore pulsanti piani aggiornati.');
