@@ -19,23 +19,12 @@
       var btn = document.getElementById(id);
       if(btn) btn.remove();
     });
+    document.querySelectorAll('.hc-install-direct').forEach(function(btn){ btn.remove(); });
   }
 
   async function handleInstallClick(){
     if(isStandalone()) { hideInstallButtons(); return; }
-    var ua = navigator.userAgent || '';
-    if(/Android/i.test(ua)) {
-      window.location.href = '/scarica-android.html';
-      return;
-    }
-    if(deferredPrompt) {
-      deferredPrompt.prompt();
-      try { await deferredPrompt.userChoice; } catch(e) {}
-      deferredPrompt = null;
-      hideInstallButtons();
-      return;
-    }
-    alert('Su iPhone apri il sito da Safari, premi Condividi e scegli Aggiungi a schermata Home.');
+    window.location.href = '/scarica-android.html';
   }
 
   function makeButton(id){
@@ -49,7 +38,7 @@
 
   function showHeaderButton(){
     if(isStandalone()) return false;
-    if(document.getElementById('homecare-install-header')) return true;
+    if(document.getElementById('homecare-install-header') || document.querySelector('.hc-install-direct')) return true;
     var top = document.querySelector('.top');
     if(!top) return false;
     var target = top.children && top.children.length ? top.children[top.children.length - 1] : top;
@@ -94,8 +83,9 @@
     var tries = 0;
     var timer = setInterval(function(){
       tries += 1;
+      if(isStandalone()) { hideInstallButtons(); clearInterval(timer); return; }
       showInstallButtons();
-      if(tries >= 8 || document.getElementById('homecare-install-header')) clearInterval(timer);
+      if(tries >= 10 || document.getElementById('homecare-install-header') || document.querySelector('.hc-install-direct')) clearInterval(timer);
     }, 700);
   }
 
