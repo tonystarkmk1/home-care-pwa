@@ -2,10 +2,11 @@ services:
   - type: web
     name: home-care-pwa
     runtime: node
+    region: frankfurt
     plan: starter
-    buildCommand: npm install
-    preDeployCommand: npm run migrate && npm run seed
-    startCommand: node scripts/start-stable.js
+    buildCommand: npm install && npm run check
+    preDeployCommand: npm run predeploy
+    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -41,4 +42,7 @@ services:
 
 databases:
   - name: home-care-db
+    region: frankfurt
     plan: basic-256mb
+    databaseName: homecare
+    user: homecare
