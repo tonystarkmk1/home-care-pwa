@@ -6,7 +6,7 @@ services:
     plan: starter
     buildCommand: npm install && npm run check
     preDeployCommand: npm run predeploy
-    startCommand: node scripts/generate-pwa-png-icons.js && node scripts/patch-install-button-only.js && node scripts/start-stable.js
+    startCommand: node scripts/start-stable.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
