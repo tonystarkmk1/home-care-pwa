@@ -44,17 +44,13 @@ La configurazione crea:
 
 1. Vai su Render e scegli **New > Blueprint**.
 2. Collega questo repository GitHub.
-3. Quando Render chiede le variabili `sync: false`, compila almeno:
+3. Quando Render chiede le variabili `sync: false`, compila:
    - `ADMIN_EMAIL`: email admin iniziale;
    - `ADMIN_PASSWORD`: password admin iniziale.
-4. Puoi lasciare vuote al primo test:
-   - `APP_URL`;
-   - `STRIPE_SECRET_KEY`;
-   - `STRIPE_WEBHOOK_SECRET`;
-   - `BREVO_API_KEY`;
-   - `BREVO_SENDER_EMAIL`.
-5. Avvia il Blueprint.
-6. A deploy concluso, apri l'URL `onrender.com` del servizio e accedi con `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
+4. Avvia il Blueprint.
+5. A deploy concluso, apri l'URL `onrender.com` del servizio e accedi con `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
+
+Per il primo test non serve configurare Stripe o Brevo. Se Brevo non è configurato, dopo la registrazione cliente l'app mostra un link di conferma di test.
 
 ### Comandi usati da Render
 
@@ -79,13 +75,19 @@ npm run migrate && npm run seed
 | `JWT_SECRET` | Sì | Generata automaticamente da Render. |
 | `ADMIN_EMAIL` | Sì | Email admin iniziale. |
 | `ADMIN_PASSWORD` | Sì | Password admin iniziale. |
-| `APP_URL` | No | Puoi impostarla dopo il primo deploy con l'URL Render o il dominio. |
-| `STRIPE_SECRET_KEY` | No | Necessaria solo per attivare Stripe. |
-| `STRIPE_WEBHOOK_SECRET` | No | Necessaria solo per verificare i webhook Stripe. |
-| `BREVO_API_KEY` | No | Necessaria solo per inviare email reali. |
-| `BREVO_SENDER_EMAIL` | No | Mittente email Brevo. |
-| `BREVO_SENDER_NAME` | No | Default: `Home Care`. |
+| `APP_WHATSAPP` | No | Default Blueprint: `80872207`. |
+| `BREVO_SENDER_NAME` | No | Default Blueprint: `Home Care`. |
 | `UPLOAD_DIR` | Sì | Default: `uploads`. |
+
+Variabili opzionali da aggiungere manualmente in Render quando vuoi attivare funzioni esterne:
+
+| Variabile | Quando serve |
+| --- | --- |
+| `APP_URL` | Quando colleghi un dominio o vuoi forzare l'URL pubblico dell'app. |
+| `STRIPE_SECRET_KEY` | Per attivare Stripe. |
+| `STRIPE_WEBHOOK_SECRET` | Per verificare i webhook Stripe. |
+| `BREVO_API_KEY` | Per inviare email reali. |
+| `BREVO_SENDER_EMAIL` | Mittente email Brevo. |
 
 ## Stripe
 
