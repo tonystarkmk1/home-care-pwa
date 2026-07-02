@@ -11,8 +11,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: APP_URL
-        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
@@ -27,14 +25,6 @@ services:
         sync: false
       - key: APP_WHATSAPP
         value: "80872207"
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      - key: BREVO_API_KEY
-        sync: false
-      - key: BREVO_SENDER_EMAIL
-        sync: false
       - key: BREVO_SENDER_NAME
         value: Home Care
       - key: UPLOAD_DIR
