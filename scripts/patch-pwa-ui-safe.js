@@ -12,20 +12,33 @@ if (!html.includes('apple-mobile-web-app-capable')) {
   );
 }
 
-// Funzione installazione: prova PWA nativa; su Android offre APK vero; su iPhone dà istruzioni.
+// Funzione installazione: su Android scarica l'APK vero; su altri browser prova PWA nativa; su iPhone dà istruzioni.
 if (!html.includes('let deferredInstallPrompt')) {
   const installCode = [
     'let deferredInstallPrompt=null;',
     "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredInstallPrompt=e});",
     'async function installApp(){',
-    '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;return}',
     "  const ua=navigator.userAgent||'';",
-    "  if(/Android/i.test(ua)){ if(confirm('Vuoi scaricare la versione Android installabile di Home Care?')) location.href='/scarica-android.html'; return; }",
+    "  if(/Android/i.test(ua)){ location.href='/scarica-android.html'; return; }",
+    '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;return}',
     "  alert('Su iPhone apri il sito da Safari, premi Condividi e scegli Aggiungi a schermata Home.');",
     '}',
   ].join('\n') + '\n';
   html = html.replace('async function boot()', installCode + 'async function boot()');
 }
+
+// Se una versione precedente della funzione è già stata inserita, la riscriviamo dando priorità all'APK Android.
+html = html.replace(
+  /async function installApp\(\)\{[\s\S]*?\n\}/,
+  [
+    'async function installApp(){',
+    "  const ua=navigator.userAgent||'';",
+    "  if(/Android/i.test(ua)){ location.href='/scarica-android.html'; return; }",
+    '  if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;return}',
+    "  alert('Su iPhone apri il sito da Safari, premi Condividi e scegli Aggiungi a schermata Home.');",
+    '}'
+  ].join('\n')
+);
 
 // Colore unico per tutti i pulsanti “Richiedi questo servizio”.
 html = html.replace("class=\"btn ${id==='base'?'gold':'teal'}\"", "class=\"btn teal\"");
@@ -41,4 +54,4 @@ html = html.replace(
 );
 
 fs.writeFileSync(indexPath, html);
-console.log('PWA/APK installabile con PNG e colore pulsanti piani aggiornati.');
+console.log('Installazione Android APK prioritaria, PWA/iOS e colore pulsanti aggiornati.');
