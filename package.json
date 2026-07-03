@@ -5,12 +5,12 @@
   "description": "PWA gestionale Home Care per clienti, immobili, GPS, controlli, report, dashboard e pagamenti Stripe.",
   "main": "server3.js",
   "scripts": {
-    "start": "node scripts/generate-pwa-png-icons.js && node scripts/patch-install-button-only.js && node scripts/start-stable.js",
+    "start": "node scripts/start-stable.js",
     "dev": "nodemon server3.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "predeploy": "npm run migrate && npm run seed",
-    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/generate-pwa-png-icons.js && node --check scripts/patch-install-button-only.js"
+    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/generate-pwa-png-icons.js && node --check scripts/patch-install-button-only.js && node --check scripts/patch-custom-plan-v1.js && node --check public/custom-plan-v1.js && node --check public/install-app.js"
   },
   "engines": {
     "node": ">=20"
