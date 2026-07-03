@@ -23,6 +23,12 @@ try {
 }
 
 try {
+  require('./patch-client-pay-date-v1.js');
+} catch (error) {
+  console.warn('Patch pagamenti piano/date non applicata:', error.message);
+}
+
+try {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   if (!html.includes('apple-mobile-web-app-capable')) {
@@ -48,13 +54,13 @@ try {
   );
 
   if (!html.includes('/install-app.js')) {
-    html = html.replace('</body></html>', '<script src="/install-app.js?v=23"></script></body></html>');
+    html = html.replace('</body></html>', '<script src="/install-app.js?v=24"></script></body></html>');
   } else {
-    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=23');
+    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=24');
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: installa solo pubblico, personalizzato, contatti, icone PWA e colori applicati.');
+  console.log('Avvio stabile: installa solo pubblico, personalizzato, contatti, pagamenti piano/date, icone PWA e colori applicati.');
 } catch (error) {
   console.warn('Patch install app non applicata:', error.message);
 }
