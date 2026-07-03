@@ -10,7 +10,7 @@
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "predeploy": "npm run migrate && npm run seed",
-    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/generate-pwa-png-icons.js && node --check scripts/patch-install-button-only.js && node --check scripts/patch-custom-plan-v1.js && node --check public/custom-plan-v1.js && node --check public/install-app.js"
+    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/generate-pwa-png-icons.js && node --check scripts/patch-install-button-only.js && node --check scripts/patch-custom-plan-v1.js && node --check scripts/patch-contacts-v1.js && node --check public/custom-plan-v1.js && node --check public/contacts-v1.js && node --check public/install-app.js"
   },
   "engines": {
     "node": ">=20"
