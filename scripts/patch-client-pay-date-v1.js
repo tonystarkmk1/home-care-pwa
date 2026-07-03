@@ -9,7 +9,9 @@ function patchIndex() {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   if (!html.includes('/client-pay-date-v1.js')) {
-    html = html.replace('<script>\nconst app=', '<script src="/client-pay-date-v1.js?v=1"></script>\n<script>\nconst app=');
+    html = html.replace('<script>\nconst app=', '<script src="/client-pay-date-v1.js?v=2"></script>\n<script>\nconst app=');
+  } else {
+    html = html.replace(/\/client-pay-date-v1\.js\?v=\d+/g, '/client-pay-date-v1.js?v=2');
   }
 
   if (!html.includes('window.applyClientPayDateV1')) {
@@ -84,7 +86,8 @@ app.post('/api/client/plan-checkout', auth(), clientOnly, async (req, res) => {
   const cfg = packages[pkg] || packages.base;
   const property = (await q("SELECT * FROM properties WHERE customer_id=$1 AND active=TRUE ORDER BY approved_at DESC NULLS LAST, created_at DESC LIMIT 1", [customer.id])).rows[0];
   const usePropertyPrice = property && property.package_type === pkg && property.monthly_price_cents;
-  const monthlyCents = Number(usePropertyPrice ? property.monthly_price_cents : cfg.priceCents);
+  const customMonthly = pkg === 'personalizzato' ? cents(req.body.custom_monthly_price_euro) : null;
+  const monthlyCents = Number(customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));
   if (!monthlyCents) return res.status(400).json({ error: 'Importo piano non valido' });
   let stripeCustomerId = customer.stripe_customer_id;
   if (!stripeCustomerId) {
@@ -95,16 +98,17 @@ app.post('/api/client/plan-checkout', auth(), clientOnly, async (req, res) => {
   const rawBase = PUBLIC_URL || appUrl(req);
   const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
   const annual = billing === 'annual';
+  const description = pkg === 'personalizzato' && req.body.custom_summary ? String(req.body.custom_summary).slice(0, 450) : (annual ? 'Pagamento annuale piano Home Care' : 'Abbonamento mensile Home Care');
   const priceData = annual
-    ? { currency: 'eur', unit_amount: monthlyCents * 12, product_data: { name: 'Home Care annuale - ' + (cfg.label || pkg), description: 'Pagamento annuale piano Home Care' } }
-    : { currency: 'eur', unit_amount: monthlyCents, recurring: { interval: 'month' }, product_data: { name: 'Home Care - ' + (cfg.label || pkg), description: 'Abbonamento mensile Home Care' } };
+    ? { currency: 'eur', unit_amount: monthlyCents * 12, product_data: { name: 'Home Care annuale - ' + (cfg.label || pkg), description } }
+    : { currency: 'eur', unit_amount: monthlyCents, recurring: { interval: 'month' }, product_data: { name: 'Home Care - ' + (cfg.label || pkg), description } };
   const session = await stripe.checkout.sessions.create({
     customer: stripeCustomerId,
     mode: annual ? 'payment' : 'subscription',
     line_items: [{ quantity: 1, price_data: priceData }],
     success_url: base + (annual ? '/?annual=success' : '/?subscription=success'),
     cancel_url: base + '/?payment=cancel',
-    metadata: { kind: annual ? 'plan_annual' : 'plan_subscription', customerId: customer.id, packageType: pkg },
+    metadata: { kind: annual ? 'plan_annual' : 'plan_subscription', customerId: customer.id, packageType: pkg, monthlyCents: String(monthlyCents) },
   });
   res.json({ url: session.url, billing, amount_cents: annual ? monthlyCents * 12 : monthlyCents, package_type: pkg });
 });
@@ -121,7 +125,7 @@ app.post('/api/client/plan-checkout', auth(), clientOnly, async (req, res) => {
 try {
   patchIndex();
   patchServer();
-  console.log('Patch pagamenti piano e date V1 applicata.');
+  console.log('Patch pagamenti piano e date V2 applicata.');
 } catch (error) {
-  console.warn('Patch pagamenti piano e date V1 non applicata:', error.message);
+  console.warn('Patch pagamenti piano e date V2 non applicata:', error.message);
 }
