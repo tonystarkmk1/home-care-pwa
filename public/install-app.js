@@ -1,8 +1,9 @@
 (function () {
-  var APP_VERSION = 'home-care-pwa-v14';
+  var APP_VERSION = 'home-care-pwa-v15';
   var DISMISS_KEY = 'homecare:pwa-install-dismissed';
   var deferredPrompt = null;
   var mutationObserver = null;
+  var rescueShown = false;
 
   function safeRead(key) {
     try { return window.localStorage.getItem(key); } catch (_) { return null; }
@@ -17,7 +18,7 @@
   }
 
   function isStandalone() {
-    return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
       || window.navigator.standalone === true
       || /HomeCareAndroid/i.test(window.navigator.userAgent || '');
   }
@@ -33,6 +34,12 @@
 
   function shouldHideInstall() {
     return isStandalone() || safeRead(DISMISS_KEY) === APP_VERSION;
+  }
+
+  function appHasContent() {
+    var app = document.getElementById('app');
+    if (!app) return true;
+    return Boolean(app.children.length || app.textContent.trim());
   }
 
   function toast(message) {
@@ -90,10 +97,11 @@
 
   function bindExistingInstallButtons(root) {
     (root || document).querySelectorAll('.hc-install-direct,[data-pwa-manual-install],[data-install-app]').forEach(function (button) {
-      if (button.getAttribute('data-pwa-bound') === 'true') return;
-      button.removeAttribute('onclick');
-      button.setAttribute('data-pwa-bound', 'true');
-      button.addEventListener('click', requestInstall);
+      if (button.getAttribute('data-pwa-bound') !== 'true') {
+        button.removeAttribute('onclick');
+        button.setAttribute('data-pwa-bound', 'true');
+        button.addEventListener('click', requestInstall);
+      }
       if (!button.textContent.trim()) button.textContent = 'Installa app';
       button.hidden = shouldHideInstall();
     });
@@ -230,6 +238,21 @@
     toast('Apri il menu del browser e scegli “Installa app” o “Aggiungi alla schermata Home”.');
   }
 
+  function resetSessionAndReload() {
+    safeRemove('hc_token');
+    window.location.href = '/?v=pwa-repair-' + Date.now();
+  }
+
+  function rescueBlankApp() {
+    var app = document.getElementById('app');
+    if (!app || appHasContent() || rescueShown) return;
+    rescueShown = true;
+    app.innerHTML = '<div class="top"><div class="brand">⌂ Home <span>Care</span></div><div><button class="btn light small" id="homecare-rescue-reload" type="button">Ricarica</button></div></div><main class="wrap"><div class="card"><h1>Home Care si sta caricando</h1><p class="muted">Ho rilevato un caricamento incompleto. Riprova oppure riapri senza la vecchia sessione salvata.</p><button class="btn" id="homecare-rescue-reset" type="button">Riapri Home Care</button></div></main>';
+    document.getElementById('homecare-rescue-reload')?.addEventListener('click', function () { window.location.reload(); });
+    document.getElementById('homecare-rescue-reset')?.addEventListener('click', resetSessionAndReload);
+    syncInstallUi();
+  }
+
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) return;
@@ -250,6 +273,7 @@
     window.setTimeout(syncInstallUi, 700);
     window.setTimeout(syncInstallUi, 1600);
     window.setTimeout(syncInstallUi, 3200);
+    window.setTimeout(rescueBlankApp, 4500);
   }
 
   window.addEventListener('beforeinstallprompt', function (event) {
@@ -277,7 +301,8 @@
 
   window.HomeCarePwaInstall = {
     request: requestInstall,
-    sync: syncInstallUi
+    sync: syncInstallUi,
+    resetSessionAndReload: resetSessionAndReload
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
