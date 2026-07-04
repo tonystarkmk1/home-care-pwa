@@ -1,4 +1,4 @@
-const SW_VERSION = 'v16';
+const SW_VERSION = 'v17';
 const SHELL_CACHE = `home-care-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `home-care-runtime-${SW_VERSION}`;
 
