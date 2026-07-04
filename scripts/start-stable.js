@@ -29,6 +29,12 @@ try {
 }
 
 try {
+  require('./patch-plan-settings-v1.js');
+} catch (error) {
+  console.warn('Patch Piani/Listino non applicata:', error.message);
+}
+
+try {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   if (!html.includes('apple-mobile-web-app-capable')) {
@@ -54,13 +60,13 @@ try {
   );
 
   if (!html.includes('/install-app.js')) {
-    html = html.replace('</body></html>', '<script src="/install-app.js?v=24"></script></body></html>');
+    html = html.replace('</body></html>', '<script src="/install-app.js?v=25"></script></body></html>');
   } else {
-    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=24');
+    html = html.replace(/\/install-app\.js\?v=\d+/g, '/install-app.js?v=25');
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: installa solo pubblico, personalizzato, contatti, pagamenti piano/date, icone PWA e colori applicati.');
+  console.log('Avvio stabile: installa solo pubblico, personalizzato, contatti, pagamenti/date, piani/listino, icone PWA e colori applicati.');
 } catch (error) {
   console.warn('Patch install app non applicata:', error.message);
 }
