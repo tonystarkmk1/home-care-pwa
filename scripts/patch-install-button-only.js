@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 30;
+const INSTALL_SCRIPT_VERSION = 31;
 
 let html = fs.readFileSync(indexPath, 'utf8');
 
@@ -58,4 +58,4 @@ if (!html.includes('/install-app.js')) {
 }
 
 fs.writeFileSync(indexPath, html);
-console.log('Patch installazione PWA applicata: flusso ScoutMe, prompt nativo, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
+console.log('Patch installazione PWA applicata: pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
