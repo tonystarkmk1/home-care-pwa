@@ -1,10 +1,11 @@
 (function () {
-  var APP_VERSION = 'home-care-pwa-v17';
+  var APP_VERSION = 'home-care-pwa-v18';
   var DISMISS_KEY = 'homecare:pwa-install-dismissed';
-  var deferredPrompt = null;
+  var deferredPrompt = window.__homeCarePwaPrompt || null;
   var mutationObserver = null;
   var rescueShown = false;
   var syncTimer = null;
+  var controllerReloadBound = false;
 
   function safeRead(key) {
     try { return window.localStorage.getItem(key); } catch (e) { return null; }
@@ -18,6 +19,14 @@
     try { window.localStorage.removeItem(key); } catch (e) {}
   }
 
+  function safeSessionRead(key) {
+    try { return window.sessionStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  function safeSessionWrite(key, value) {
+    try { window.sessionStorage.setItem(key, value); } catch (e) {}
+  }
+
   function getApp() {
     return document.getElementById('app');
   }
@@ -26,6 +35,11 @@
     var app = getApp();
     if (!app) return true;
     return Boolean(app.children.length || String(app.textContent || '').trim());
+  }
+
+  function getDeferredPrompt() {
+    if (!deferredPrompt && window.__homeCarePwaPrompt) deferredPrompt = window.__homeCarePwaPrompt;
+    return deferredPrompt;
   }
 
   function isStandalone() {
@@ -41,13 +55,8 @@
       || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
   }
 
-  function isSamsungBrowser() {
-    return /SamsungBrowser/i.test(window.navigator.userAgent || '');
-  }
-
-  function isSmallScreen() {
-    try { return Boolean(window.matchMedia && window.matchMedia('(max-width: 860px)').matches); }
-    catch (e) { return false; }
+  function canOfferInstall() {
+    return Boolean(getDeferredPrompt()) || isIosDevice();
   }
 
   function shouldHideInstall() {
@@ -82,15 +91,14 @@
       '#homecare-install-banner small{display:block;color:#64748b;line-height:1.25}',
       '#homecare-install-banner .hc-pwa-actions{display:flex;gap:8px;align-items:center;flex:0 0 auto}',
       '#homecare-install-banner .hc-pwa-dismiss{border:0;background:transparent;color:#64748b;font-size:24px;line-height:1;cursor:pointer;padding:6px}',
-      '#homecare-pwa-ios-modal[hidden],#homecare-pwa-android-modal[hidden]{display:none!important}',
-      '#homecare-pwa-ios-modal,#homecare-pwa-android-modal{position:fixed;inset:0;z-index:999999;display:grid;place-items:center;padding:20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
-      '#homecare-pwa-ios-modal .hc-pwa-backdrop,#homecare-pwa-android-modal .hc-pwa-backdrop{position:absolute;inset:0;background:rgba(6,36,58,.48)}',
-      '#homecare-pwa-ios-modal .hc-pwa-card,#homecare-pwa-android-modal .hc-pwa-card{position:relative;max-width:430px;width:100%;background:#fffdf7;color:#06243a;border-radius:26px;padding:24px;border:1px solid #e2d7c8;box-shadow:0 24px 70px rgba(0,0,0,.32)}',
-      '#homecare-pwa-ios-modal img,#homecare-pwa-android-modal img{width:66px;height:66px;border-radius:18px}',
-      '#homecare-pwa-ios-modal h2,#homecare-pwa-android-modal h2{margin:12px 0 8px}',
-      '#homecare-pwa-ios-modal ol,#homecare-pwa-android-modal ol{line-height:1.65;padding-left:22px}',
-      '#homecare-pwa-ios-modal .hc-pwa-close,#homecare-pwa-android-modal .hc-pwa-close{position:absolute;right:12px;top:10px;border:0;background:transparent;font-size:28px;cursor:pointer;color:#64748b}',
-      '#homecare-pwa-android-modal .hc-pwa-note{background:#fff8e8;border-left:5px solid #c7952d;border-radius:14px;padding:10px 12px;margin:12px 0;color:#06243a}',
+      '#homecare-pwa-ios-modal[hidden]{display:none!important}',
+      '#homecare-pwa-ios-modal{position:fixed;inset:0;z-index:999999;display:grid;place-items:center;padding:20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
+      '#homecare-pwa-ios-modal .hc-pwa-backdrop{position:absolute;inset:0;background:rgba(6,36,58,.48)}',
+      '#homecare-pwa-ios-modal .hc-pwa-card{position:relative;max-width:430px;width:100%;background:#fffdf7;color:#06243a;border-radius:26px;padding:24px;border:1px solid #e2d7c8;box-shadow:0 24px 70px rgba(0,0,0,.32)}',
+      '#homecare-pwa-ios-modal img{width:66px;height:66px;border-radius:18px}',
+      '#homecare-pwa-ios-modal h2{margin:12px 0 8px}',
+      '#homecare-pwa-ios-modal ol{line-height:1.65;padding-left:22px}',
+      '#homecare-pwa-ios-modal .hc-pwa-close{position:absolute;right:12px;top:10px;border:0;background:transparent;font-size:28px;cursor:pointer;color:#64748b}',
       '#homecare-pwa-toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(14px);z-index:1000000;background:#06243a;color:white;border-radius:999px;padding:11px 15px;font-weight:900;box-shadow:0 14px 32px rgba(6,36,58,.28);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;max-width:min(92vw,520px);text-align:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
       '#homecare-pwa-toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}',
       '@media(max-width:560px){#homecare-install-banner{align-items:flex-start;flex-direction:column}.hc-pwa-actions{width:100%}#homecare-install-banner .btn{flex:1}}'
@@ -151,13 +159,13 @@
         button.addEventListener('click', requestInstall);
       }
       if (!String(button.textContent || '').trim()) button.textContent = 'Installa app';
-      button.hidden = shouldHideInstall();
+      button.hidden = shouldHideInstall() || !canOfferInstall();
     });
   }
 
   function ensureHeaderButton() {
     var top = document.querySelector('.top');
-    if (!top || shouldHideInstall()) return;
+    if (!top || shouldHideInstall() || !canOfferInstall()) return;
     bindExistingInstallButtons(top);
     if (top.querySelector('#homecare-install-header,.hc-install-direct,[data-pwa-manual-install]')) return;
     var target = top.children && top.children.length ? top.children[top.children.length - 1] : top;
@@ -199,41 +207,9 @@
     });
   }
 
-  function ensureAndroidModal() {
-    if (document.getElementById('homecare-pwa-android-modal')) return;
-    var samsung = isSamsungBrowser();
-    var title = samsung ? 'Installa da Samsung Internet' : 'Installa Home Care da Android';
-    var steps = samsung
-      ? '<li>Tocca il menu <strong>⋮</strong> in basso a destra.</li><li>Scegli <strong>Aggiungi pagina a</strong>, <strong>Aggiungi a schermata Home</strong> oppure <strong>Installa app</strong>.</li><li>Seleziona <strong>Schermata Home</strong> e conferma con <strong>Aggiungi</strong>.</li>'
-      : '<li>Tocca il menu <strong>⋮</strong> del browser.</li><li>Scegli <strong>Installa app</strong> oppure <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma con <strong>Installa</strong> o <strong>Aggiungi</strong>.</li>';
-    var note = samsung
-      ? 'Su Samsung Internet il popup nativo può non partire dal pulsante della pagina: l’installazione passa dal menu del browser.'
-      : 'Se il popup nativo non compare, usa il menu del browser per aggiungerla alla schermata Home.';
-    var modal = document.createElement('div');
-    modal.id = 'homecare-pwa-android-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', 'homecare-pwa-android-title');
-    modal.hidden = true;
-    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="/icon-192.png" alt="Home Care"><h2 id="homecare-pwa-android-title">' + title + '</h2><div class="hc-pwa-note">' + note + '</div><ol>' + steps + '</ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
-    document.body.appendChild(modal);
-    var closers = modal.querySelectorAll('[data-pwa-close]');
-    Array.prototype.forEach.call(closers, function (element) {
-      element.addEventListener('click', function () { setAndroidModal(false); });
-    });
-  }
-
   function setIosModal(open) {
     ensureIosModal();
     var modal = document.getElementById('homecare-pwa-ios-modal');
-    if (!modal) return;
-    modal.hidden = !open;
-    document.body.style.overflow = open ? 'hidden' : '';
-  }
-
-  function setAndroidModal(open) {
-    ensureAndroidModal();
-    var modal = document.getElementById('homecare-pwa-android-modal');
     if (!modal) return;
     modal.hidden = !open;
     document.body.style.overflow = open ? 'hidden' : '';
@@ -254,7 +230,7 @@
     if (!appHasContent()) rescueBlankApp();
 
     bindExistingInstallButtons(document);
-    if (shouldHideInstall()) {
+    if (shouldHideInstall() || !canOfferInstall()) {
       hideInstallUi();
       return;
     }
@@ -262,7 +238,6 @@
     ensureHeaderButton();
     ensureBanner();
     ensureIosModal();
-    ensureAndroidModal();
     bindExistingInstallButtons(document);
 
     var buttons = document.querySelectorAll('#homecare-install-header,.hc-install-direct,[data-pwa-manual-install]');
@@ -275,23 +250,15 @@
     var message = document.getElementById('homecare-install-message');
     var action = document.getElementById('homecare-install-action');
     var ios = isIosDevice();
-    var samsung = isSamsungBrowser();
-    var canPrompt = Boolean(deferredPrompt);
-    var showBanner = canPrompt || ios || isSmallScreen();
+    var canPrompt = Boolean(getDeferredPrompt());
 
-    if (banner) banner.hidden = !showBanner;
+    if (banner) banner.hidden = !(canPrompt || ios);
     if (message) {
-      if (ios && !canPrompt) {
-        message.textContent = 'Su iPhone si installa da Safari: Condividi → Aggiungi alla schermata Home.';
-      } else if (!canPrompt && samsung) {
-        message.textContent = 'Su Samsung Internet si installa dal menu ⋮ → Aggiungi pagina a → Schermata Home.';
-      } else if (!canPrompt) {
-        message.textContent = 'Se il popup non compare, usa il menu del browser → Installa app o Aggiungi alla schermata Home.';
-      } else {
-        message.textContent = 'Aggiungila al dispositivo e aprila come una vera app.';
-      }
+      message.textContent = ios && !canPrompt
+        ? 'Su iPhone si installa da Safari: Condividi → Aggiungi alla schermata Home.'
+        : 'Aggiungila al dispositivo e aprila come una vera app.';
     }
-    if (action) action.textContent = canPrompt ? 'Installa' : 'Guida installazione';
+    if (action) action.textContent = ios && !canPrompt ? 'Mostra istruzioni' : 'Installa';
   }
 
   function scheduleSync() {
@@ -308,9 +275,10 @@
       return;
     }
 
-    if (deferredPrompt) {
-      var promptEvent = deferredPrompt;
+    var promptEvent = getDeferredPrompt();
+    if (promptEvent) {
       deferredPrompt = null;
+      window.__homeCarePwaPrompt = null;
       try {
         Promise.resolve(promptEvent.prompt()).then(function () {
           return promptEvent.userChoice ? promptEvent.userChoice : { outcome: 'unknown' };
@@ -323,11 +291,11 @@
           }
           syncInstallUi();
         }).catch(function () {
-          setAndroidModal(true);
+          toast('Apri il menu del browser e scegli “Installa app” o “Aggiungi alla schermata Home”.');
           syncInstallUi();
         });
       } catch (e) {
-        setAndroidModal(true);
+        toast('Apri il menu del browser e scegli “Installa app” o “Aggiungi alla schermata Home”.');
         syncInstallUi();
       }
       return;
@@ -338,7 +306,7 @@
       return;
     }
 
-    setAndroidModal(true);
+    hideInstallUi();
   }
 
   function resetSessionAndReload() {
@@ -346,10 +314,23 @@
     window.location.href = '/?v=pwa-repair-' + Date.now();
   }
 
+  function bindControllerReload() {
+    if (controllerReloadBound || !('serviceWorker' in navigator)) return;
+    controllerReloadBound = true;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (safeSessionRead('homecare:sw-controller-reload') === APP_VERSION) return;
+      safeSessionWrite('homecare:sw-controller-reload', APP_VERSION);
+      window.location.reload();
+    });
+  }
+
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (window.location.protocol !== 'https:' && ['localhost', '127.0.0.1', '[::1]'].indexOf(window.location.hostname) === -1) return;
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+    bindControllerReload();
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function (registration) {
+      if (registration && registration.update) registration.update().catch(function () {});
+    }).catch(function () {});
   }
 
   function startObserver() {
@@ -372,11 +353,18 @@
   window.addEventListener('beforeinstallprompt', function (event) {
     event.preventDefault();
     deferredPrompt = event;
+    window.__homeCarePwaPrompt = event;
+    syncInstallUi();
+  });
+
+  window.addEventListener('homecarebeforeinstallprompt', function () {
+    if (window.__homeCarePwaPrompt) deferredPrompt = window.__homeCarePwaPrompt;
     syncInstallUi();
   });
 
   window.addEventListener('appinstalled', function () {
     deferredPrompt = null;
+    window.__homeCarePwaPrompt = null;
     safeRemove(DISMISS_KEY);
     hideInstallUi();
     toast('Home Care è stata installata.');
@@ -391,10 +379,7 @@
   });
 
   window.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') {
-      setIosModal(false);
-      setAndroidModal(false);
-    }
+    if (event.key === 'Escape') setIosModal(false);
   });
 
   window.addEventListener('focus', syncInstallUi);
