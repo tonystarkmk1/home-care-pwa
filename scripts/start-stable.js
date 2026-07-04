@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 26;
+const INSTALL_SCRIPT_VERSION = 27;
 
 function runPatch(label, fn) {
   try {
@@ -52,20 +52,18 @@ runPatch('Patch installazione PWA', () => {
   ensureHeadTag('name="apple-mobile-web-app-title"', '<meta name="apple-mobile-web-app-title" content="Home Care">');
   ensureHeadTag('name="application-name"', '<meta name="application-name" content="Home Care">');
 
-  // Colore unico per tutti i pulsanti “Richiedi questo servizio”.
-  html = html.replace("class=\"btn ${id==='base'?'gold':'teal'}\"", 'class="btn teal"');
-
-  // Rimuove tutte le vecchie iniezioni del pulsante, inclusa la vecchia scorciatoia APK.
+  // Non modifichiamo più le stringhe HTML interne dell'app per aggiungere il pulsante:
+  // install-app.js lo crea dinamicamente quando la barra è presente. Così evitiamo schermate bianche.
   html = html.replace(/<button class="btn light small hc-install-direct"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button data-install-app class="btn light small"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
 
-  // Pulsante installa nella barra pubblica: install-app.js apre il prompt PWA nativo o le istruzioni iOS.
-  const installBtn = '<button class="btn light small hc-install-direct" type="button" data-pwa-manual-install>Installa app</button> ';
-  html = html.replace(
-    '<button class="btn light small" onclick="authView(\'login\')">Accedi</button>',
-    installBtn + '<button class="btn light small" onclick="authView(\'login\')">Accedi</button>'
-  );
+  // Boot più robusto: mostra subito un caricamento e non lascia la pagina bianca se la sessione/API resta appesa.
+  const originalBoot = "async function boot(){try{S.config=await api('/api/config',{headers:{}})}catch(e){}if(!S.token)return publicHome();try{S.user=(await api('/api/auth/me')).user;shell()}catch(e){localStorage.removeItem('hc_token');publicHome(e.message)}}";
+  const safeBoot = "async function boot(){app.innerHTML='<main class=\"wrap\"><div class=\"card\"><h2>Caricamento Home Care...</h2><p class=\"muted\">Preparazione app in corso.</p></div></main>';const startupToken=S.token;const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);try{S.config=await withTimeout(api('/api/config',{headers:{}}),6000,'Configurazione temporaneamente non raggiungibile')}catch(e){}if(!startupToken)return publicHome();try{S.user=(await withTimeout(api('/api/auth/me'),8000,'Sessione non verificata. Accedi di nuovo.')).user;shell()}catch(e){localStorage.removeItem('hc_token');S.token=null;publicHome(e.message||'Sessione scaduta. Accedi di nuovo.')}}";
+  if (html.includes(originalBoot)) {
+    html = html.replace(originalBoot, safeBoot);
+  }
 
   const installScript = `<script src="/install-app.js?v=${INSTALL_SCRIPT_VERSION}"></script>`;
   if (!html.includes('/install-app.js')) {
@@ -75,7 +73,7 @@ runPatch('Patch installazione PWA', () => {
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: PWA installabile con prompt nativo, iOS, icone, personalizzato, contatti, pagamenti/date, piani/listino e colori applicati.');
+  console.log('Avvio stabile: PWA installabile con prompt nativo, iOS, icone e protezione anti-schermo-bianco applicati.');
 });
 
 require('../server3.js');
