@@ -1,9 +1,8 @@
-const SW_VERSION = 'v14';
+const SW_VERSION = 'v16';
 const SHELL_CACHE = `home-care-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `home-care-runtime-${SW_VERSION}`;
 
 const CORE_ASSETS = [
-  '/',
   '/offline.html',
   '/manifest.json',
   '/icon.svg',
@@ -27,8 +26,7 @@ function isSensitiveUrl(url) {
 function isCacheableStatic(url) {
   return STATIC_EXTENSIONS.test(url.pathname)
     || url.pathname === '/offline.html'
-    || url.pathname === '/manifest.json'
-    || url.pathname === '/';
+    || url.pathname === '/manifest.json';
 }
 
 self.addEventListener('install', (event) => {
@@ -53,7 +51,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
