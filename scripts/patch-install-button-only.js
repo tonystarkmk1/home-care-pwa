@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 28;
+const INSTALL_SCRIPT_VERSION = 29;
 
 let html = fs.readFileSync(indexPath, 'utf8');
 
@@ -54,4 +54,4 @@ if (!html.includes('/install-app.js')) {
 }
 
 fs.writeFileSync(indexPath, html);
-console.log('Patch installazione PWA applicata: prompt nativo, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
+console.log('Patch installazione PWA applicata: prompt nativo, guida Samsung Internet, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
