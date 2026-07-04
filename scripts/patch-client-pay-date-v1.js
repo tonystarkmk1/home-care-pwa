@@ -9,9 +9,9 @@ function patchIndex() {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   if (!html.includes('/client-pay-date-v1.js')) {
-    html = html.replace('<script>\nconst app=', '<script src="/client-pay-date-v1.js?v=2"></script>\n<script>\nconst app=');
+    html = html.replace('<script>\nconst app=', '<script src="/client-pay-date-v1.js?v=3"></script>\n<script>\nconst app=');
   } else {
-    html = html.replace(/\/client-pay-date-v1\.js\?v=\d+/g, '/client-pay-date-v1.js?v=2');
+    html = html.replace(/\/client-pay-date-v1\.js\?v=\d+/g, '/client-pay-date-v1.js?v=3');
   }
 
   if (!html.includes('window.applyClientPayDateV1')) {
@@ -119,13 +119,47 @@ app.post('/api/client/plan-checkout', auth(), clientOnly, async (req, res) => {
     code = code.replace(marker, route + marker);
   }
 
+  if (!code.includes("app.post('/api/client/extra-payments/:id/pay'")) {
+    const extraRoute = `
+app.post('/api/client/extra-payments/:id/pay', auth(), clientOnly, async (req, res) => {
+  if (!stripe) return res.status(400).json({ error: 'Stripe non configurato' });
+  let payment = (await q('SELECT e.*,c.name customer_name,c.email customer_email,c.phone customer_phone,c.stripe_customer_id FROM extra_payments e JOIN customers c ON c.id=e.customer_id WHERE e.id=$1 AND e.customer_id=$2', [req.params.id, req.user.customer_id])).rows[0];
+  if (!payment) return res.status(404).json({ error: 'Preventivo non trovato' });
+  if (payment.status !== 'pending') return res.status(400).json({ error: 'Questo preventivo non è più da pagare' });
+  if (payment.payment_url) return res.json({ url: payment.payment_url, payment });
+  let stripeCustomerId = payment.stripe_customer_id;
+  if (!stripeCustomerId) {
+    const sc = await stripe.customers.create({ name: payment.customer_name, email: payment.customer_email || undefined, phone: payment.customer_phone || undefined, metadata: { customerId: payment.customer_id } });
+    stripeCustomerId = sc.id;
+    await q('UPDATE customers SET stripe_customer_id=$2,updated_at=NOW() WHERE id=$1', [payment.customer_id, stripeCustomerId]);
+  }
+  const rawBase = PUBLIC_URL || appUrl(req);
+  const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+  const session = await stripe.checkout.sessions.create({
+    customer: stripeCustomerId,
+    mode: 'payment',
+    line_items: [{ quantity: 1, price_data: { currency: 'eur', unit_amount: payment.amount_cents, product_data: { name: 'Home Care - preventivo / extra', description: payment.description } } }],
+    success_url: base + '/?extra=success',
+    cancel_url: base + '/?extra=cancel',
+    metadata: { kind: 'extra_payment', extraPaymentId: payment.id, customerId: payment.customer_id },
+  });
+  payment = (await q('UPDATE extra_payments SET stripe_session_id=$2,payment_url=$3,updated_at=NOW() WHERE id=$1 RETURNING *', [payment.id, session.id, session.url])).rows[0];
+  res.json({ url: payment.payment_url, payment });
+});
+
+`;
+    const marker = "app.get('/api/client/messages', auth(), clientOnly, async (req, res) => {";
+    if (!code.includes(marker)) throw new Error('Marker client messages non trovato');
+    code = code.replace(marker, extraRoute + marker);
+  }
+
   fs.writeFileSync(serverPath, code);
 }
 
 try {
   patchIndex();
   patchServer();
-  console.log('Patch pagamenti piano e date V2 applicata.');
+  console.log('Patch pagamenti piano, preventivi e date V3 applicata.');
 } catch (error) {
-  console.warn('Patch pagamenti piano e date V2 non applicata:', error.message);
+  console.warn('Patch pagamenti piano, preventivi e date V3 non applicata:', error.message);
 }
