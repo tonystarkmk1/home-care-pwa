@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 28;
+const INSTALL_SCRIPT_VERSION = 29;
 
 function runPatch(label, fn) {
   try {
@@ -76,7 +76,7 @@ runPatch('Patch installazione PWA', () => {
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: PWA installabile con prompt nativo, iOS, pagina pubblica immediata e protezione anti-schermo-bianco applicati.');
+  console.log('Avvio stabile: PWA installabile con prompt nativo, guida Samsung Internet, iOS, pagina pubblica immediata e protezione anti-schermo-bianco applicati.');
 });
 
 require('../server3.js');
