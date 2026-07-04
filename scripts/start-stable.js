@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 30;
+const INSTALL_SCRIPT_VERSION = 31;
 
 function runPatch(label, fn) {
   try {
@@ -57,7 +57,7 @@ runPatch('Patch installazione PWA', () => {
   );
 
   // Non modifichiamo più le stringhe HTML interne dell'app per aggiungere il pulsante:
-  // install-app.js lo crea dinamicamente quando il prompt nativo è davvero disponibile.
+  // install-app.js lo crea dinamicamente e prova prima il prompt nativo.
   html = html.replace(/<button class="btn light small hc-install-direct"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button data-install-app class="btn light small"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
@@ -80,7 +80,7 @@ runPatch('Patch installazione PWA', () => {
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: PWA allineata a ScoutMe con prompt nativo, capture anticipata, iOS, pagina pubblica immediata e protezione anti-schermo-bianco applicati.');
+  console.log('Avvio stabile: PWA con pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS, pagina pubblica immediata e protezione anti-schermo-bianco applicati.');
 });
 
 require('../server3.js');
