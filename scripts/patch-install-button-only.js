@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 27;
+const INSTALL_SCRIPT_VERSION = 28;
 
 let html = fs.readFileSync(indexPath, 'utf8');
 
@@ -41,8 +41,10 @@ html = html.replace(/<button data-install-app class="btn light small"[^>]*>Insta
 html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
 
 const originalBoot = "async function boot(){try{S.config=await api('/api/config',{headers:{}})}catch(e){}if(!S.token)return publicHome();try{S.user=(await api('/api/auth/me')).user;shell()}catch(e){localStorage.removeItem('hc_token');publicHome(e.message)}}";
-const safeBoot = "async function boot(){app.innerHTML='<main class=\"wrap\"><div class=\"card\"><h2>Caricamento Home Care...</h2><p class=\"muted\">Preparazione app in corso.</p></div></main>';const startupToken=S.token;const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);try{S.config=await withTimeout(api('/api/config',{headers:{}}),6000,'Configurazione temporaneamente non raggiungibile')}catch(e){}if(!startupToken)return publicHome();try{S.user=(await withTimeout(api('/api/auth/me'),8000,'Sessione non verificata. Accedi di nuovo.')).user;shell()}catch(e){localStorage.removeItem('hc_token');S.token=null;publicHome(e.message||'Sessione scaduta. Accedi di nuovo.')}}";
+const previousSafeBoot = "async function boot(){app.innerHTML='<main class=\"wrap\"><div class=\"card\"><h2>Caricamento Home Care...</h2><p class=\"muted\">Preparazione app in corso.</p></div></main>';const startupToken=S.token;const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);try{S.config=await withTimeout(api('/api/config',{headers:{}}),6000,'Configurazione temporaneamente non raggiungibile')}catch(e){}if(!startupToken)return publicHome();try{S.user=(await withTimeout(api('/api/auth/me'),8000,'Sessione non verificata. Accedi di nuovo.')).user;shell()}catch(e){localStorage.removeItem('hc_token');S.token=null;publicHome(e.message||'Sessione scaduta. Accedi di nuovo.')}}";
+const safeBoot = "async function boot(){const startupToken=S.token;const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);if(!startupToken){publicHome();api('/api/config',{headers:{}}).then(c=>{S.config=c}).catch(()=>{});return}app.innerHTML='<main class=\"wrap\"><div class=\"card\"><h2>Caricamento Home Care...</h2><p class=\"muted\">Preparazione area riservata in corso.</p></div></main>';try{S.config=await withTimeout(api('/api/config',{headers:{}}),5000,'Configurazione temporaneamente non raggiungibile')}catch(e){}try{S.user=(await withTimeout(api('/api/auth/me'),8000,'Sessione non verificata. Accedi di nuovo.')).user;shell()}catch(e){localStorage.removeItem('hc_token');S.token=null;publicHome(e.message||'Sessione scaduta. Accedi di nuovo.')}}";
 if (html.includes(originalBoot)) html = html.replace(originalBoot, safeBoot);
+else if (html.includes(previousSafeBoot)) html = html.replace(previousSafeBoot, safeBoot);
 
 const installScript = `<script src="/install-app.js?v=${INSTALL_SCRIPT_VERSION}"></script>`;
 if (!html.includes('/install-app.js')) {
@@ -52,4 +54,4 @@ if (!html.includes('/install-app.js')) {
 }
 
 fs.writeFileSync(indexPath, html);
-console.log('Patch installazione PWA applicata: prompt nativo, iOS e protezione anti-schermo-bianco.');
+console.log('Patch installazione PWA applicata: prompt nativo, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
