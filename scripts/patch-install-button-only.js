@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 29;
+const INSTALL_SCRIPT_VERSION = 30;
 
 let html = fs.readFileSync(indexPath, 'utf8');
 
@@ -35,6 +35,10 @@ ensureHeadTag('name="apple-mobile-web-app-capable"', '<meta name="apple-mobile-w
 ensureHeadTag('name="apple-mobile-web-app-status-bar-style"', '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
 ensureHeadTag('name="apple-mobile-web-app-title"', '<meta name="apple-mobile-web-app-title" content="Home Care">');
 ensureHeadTag('name="application-name"', '<meta name="application-name" content="Home Care">');
+ensureHeadTag(
+  '__homeCarePwaPrompt',
+  '<script>window.__homeCarePwaPrompt=null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__homeCarePwaPrompt=event;try{window.dispatchEvent(new Event("homecarebeforeinstallprompt"))}catch(e){}});</script>'
+);
 
 html = html.replace(/<button class="btn light small hc-install-direct"[^>]*>Installa app<\/button>\s*/g, '');
 html = html.replace(/<button data-install-app class="btn light small"[^>]*>Installa app<\/button>\s*/g, '');
@@ -54,4 +58,4 @@ if (!html.includes('/install-app.js')) {
 }
 
 fs.writeFileSync(indexPath, html);
-console.log('Patch installazione PWA applicata: prompt nativo, guida Samsung Internet, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
+console.log('Patch installazione PWA applicata: flusso ScoutMe, prompt nativo, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
