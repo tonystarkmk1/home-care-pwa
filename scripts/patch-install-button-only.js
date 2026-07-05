@@ -4,14 +4,27 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
-const INSTALL_SCRIPT_VERSION = 31;
+const PWA_ASSET_VERSION = 32;
+const INSTALL_SCRIPT_VERSION = 32;
 
 let html = fs.readFileSync(indexPath, 'utf8');
 
 try {
-  const source = path.join(publicDir, 'icon-192.png');
-  const target = path.join(publicDir, 'apple-touch-icon.png');
-  if (fs.existsSync(source)) fs.copyFileSync(source, target);
+  const copies = [
+    ['icons/icon-192.png', 'icon-192.png'],
+    ['icons/icon-512.png', 'icon-512.png'],
+    ['icons/icon-180.png', 'apple-touch-icon.png'],
+    ['apple-touch-icon.png', 'apple-touch-icon.png'],
+    ['favicon.ico', 'favicon.ico']
+  ];
+  for (const [from, to] of copies) {
+    const source = path.join(publicDir, from);
+    const target = path.join(publicDir, to);
+    if (fs.existsSync(source) && source !== target) {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(source, target);
+    }
+  }
 } catch (_) {}
 
 if (!html.includes('viewport-fit=cover')) {
@@ -27,9 +40,21 @@ function ensureHeadTag(uniqueText, tag) {
   }
 }
 
-ensureHeadTag('rel="icon" type="image/png" sizes="192x192"', '<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">');
-ensureHeadTag('rel="icon" type="image/png" sizes="512x512"', '<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">');
-ensureHeadTag('rel="apple-touch-icon"', '<link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png">');
+html = html.replace(/<link rel="manifest" href="\/manifest\.json(?:\?v=\d+)?">\s*/g, '');
+html = html.replace(/<link rel="shortcut icon"[^>]*>\s*/g, '');
+html = html.replace(/<link rel="icon"[^>]*>\s*/g, '');
+html = html.replace(/<link rel="apple-touch-icon"[^>]*>\s*/g, '');
+html = html.replace(/<meta name="msapplication-TileImage"[^>]*>\s*/g, '');
+html = html.replace(/<meta name="msapplication-TileColor"[^>]*>\s*/g, '');
+
+ensureHeadTag('rel="manifest"', `<link rel="manifest" href="/manifest.json?v=${PWA_ASSET_VERSION}">`);
+ensureHeadTag('rel="icon" type="image/svg+xml"', `<link rel="icon" type="image/svg+xml" href="/icon.svg?v=${PWA_ASSET_VERSION}">`);
+ensureHeadTag('rel="shortcut icon"', `<link rel="shortcut icon" href="/favicon.ico?v=${PWA_ASSET_VERSION}">`);
+ensureHeadTag('rel="icon" type="image/png" sizes="192x192"', `<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=${PWA_ASSET_VERSION}">`);
+ensureHeadTag('rel="icon" type="image/png" sizes="512x512"', `<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=${PWA_ASSET_VERSION}">`);
+ensureHeadTag('rel="apple-touch-icon"', `<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=${PWA_ASSET_VERSION}">`);
+ensureHeadTag('name="msapplication-TileImage"', `<meta name="msapplication-TileImage" content="/icon-192.png?v=${PWA_ASSET_VERSION}">`);
+ensureHeadTag('name="msapplication-TileColor"', '<meta name="msapplication-TileColor" content="#06243a">');
 ensureHeadTag('name="mobile-web-app-capable"', '<meta name="mobile-web-app-capable" content="yes">');
 ensureHeadTag('name="apple-mobile-web-app-capable"', '<meta name="apple-mobile-web-app-capable" content="yes">');
 ensureHeadTag('name="apple-mobile-web-app-status-bar-style"', '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
@@ -58,4 +83,4 @@ if (!html.includes('/install-app.js')) {
 }
 
 fs.writeFileSync(indexPath, html);
-console.log('Patch installazione PWA applicata: pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
+console.log('Patch installazione PWA applicata: icone launcher versionate, pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS, pagina pubblica immediata e protezione anti-schermo-bianco.');
