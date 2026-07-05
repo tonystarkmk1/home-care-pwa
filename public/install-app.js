@@ -1,30 +1,17 @@
 (function () {
-  var APP_VERSION = 'home-care-pwa-v19';
+  var APP_VERSION = 'home-care-pwa-v20';
+  var ICON_URL = '/icon-192.png?v=32';
   var DISMISS_KEY = 'homecare:pwa-install-dismissed';
   var RELOAD_KEY = 'homecare:sw-controller-reload';
   var deferredPrompt = window.__homeCarePwaPrompt || null;
   var mutationObserver = null;
   var syncTimer = null;
 
-  function readLocal(key) {
-    try { return window.localStorage.getItem(key); } catch (_) { return null; }
-  }
-
-  function writeLocal(key, value) {
-    try { window.localStorage.setItem(key, value); } catch (_) {}
-  }
-
-  function removeLocal(key) {
-    try { window.localStorage.removeItem(key); } catch (_) {}
-  }
-
-  function readSession(key) {
-    try { return window.sessionStorage.getItem(key); } catch (_) { return null; }
-  }
-
-  function writeSession(key, value) {
-    try { window.sessionStorage.setItem(key, value); } catch (_) {}
-  }
+  function readLocal(key) { try { return window.localStorage.getItem(key); } catch (_) { return null; } }
+  function writeLocal(key, value) { try { window.localStorage.setItem(key, value); } catch (_) {} }
+  function removeLocal(key) { try { window.localStorage.removeItem(key); } catch (_) {} }
+  function readSession(key) { try { return window.sessionStorage.getItem(key); } catch (_) { return null; } }
+  function writeSession(key, value) { try { window.sessionStorage.setItem(key, value); } catch (_) {} }
 
   function getPrompt() {
     if (!deferredPrompt && window.__homeCarePwaPrompt) deferredPrompt = window.__homeCarePwaPrompt;
@@ -33,9 +20,7 @@
 
   function isStandalone() {
     var displayStandalone = false;
-    try {
-      displayStandalone = Boolean(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-    } catch (_) {}
+    try { displayStandalone = Boolean(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch (_) {}
     return displayStandalone || window.navigator.standalone === true || /HomeCareAndroid/i.test(window.navigator.userAgent || '');
   }
 
@@ -53,12 +38,8 @@
     catch (_) { return false; }
   }
 
-  function hasDismissed() {
-    return readLocal(DISMISS_KEY) === APP_VERSION;
-  }
-
   function shouldShowInstall() {
-    if (isStandalone() || hasDismissed()) return false;
+    if (isStandalone() || readLocal(DISMISS_KEY) === APP_VERSION) return false;
     return Boolean(getPrompt()) || isIosDevice() || isMobileWidth();
   }
 
@@ -77,16 +58,10 @@
   function rescueBlankApp(message) {
     var app = document.getElementById('app');
     if (!app || appHasContent()) return;
-
     if (typeof window.publicHome === 'function') {
-      try {
-        window.publicHome(message || '');
-        return;
-      } catch (_) {}
+      try { window.publicHome(message || ''); return; } catch (_) {}
     }
-
     app.innerHTML = '<div class="top"><div class="brand">⌂ Home <span>Care</span></div><div><button class="btn light small" id="homecare-rescue-login" type="button">Accedi</button> <button class="btn gold small" id="homecare-rescue-reload" type="button">Ricarica</button></div></div><main class="wrap"><section class="hero"><div><span class="pill">Badesi e località limitrofe</span><h1>Ci prendiamo cura della <span>tua casa</span></h1><p>Controlli periodici, manutenzioni e report fotografici per seconde case, appartamenti e ville. Anche quando sei lontano, hai un referente di fiducia.</p>' + (message ? '<div class="notice">' + escapeHtml(message) + '</div>' : '') + '</div><div class="card"><h2>Come funziona</h2><p>1. Scegli il servizio più adatto.<br>2. Registrati e conferma la mail.<br>3. Inserisci l’immobile da affidare a Home Care.<br>4. Valutiamo la richiesta e pianifichiamo i controlli.</p></div></section></main>';
-
     var login = document.getElementById('homecare-rescue-login');
     var reload = document.getElementById('homecare-rescue-reload');
     if (login) login.addEventListener('click', function () {
@@ -95,9 +70,7 @@
       }
       window.location.href = '/?login=1&v=' + Date.now();
     });
-    if (reload) reload.addEventListener('click', function () {
-      window.location.href = '/?v=' + Date.now();
-    });
+    if (reload) reload.addEventListener('click', function () { window.location.href = '/?v=' + Date.now(); });
   }
 
   function toast(message) {
@@ -186,12 +159,19 @@
     banner.id = 'homecare-install-banner';
     banner.setAttribute('aria-live', 'polite');
     banner.hidden = true;
-    banner.innerHTML = '<div class="hc-pwa-copy"><img src="/icon-192.png" alt=""><span><strong>Installa Home Care</strong><small id="homecare-install-message">Aggiungila al dispositivo e aprila come una vera app.</small></span></div><div class="hc-pwa-actions"><button id="homecare-install-action" class="btn gold small" type="button">Installa</button><button id="homecare-install-dismiss" class="hc-pwa-dismiss" type="button" aria-label="Chiudi suggerimento installazione">×</button></div>';
+    banner.innerHTML = '<div class="hc-pwa-copy"><img src="' + ICON_URL + '" alt=""><span><strong>Installa Home Care</strong><small id="homecare-install-message">Aggiungila al dispositivo e aprila come una vera app.</small></span></div><div class="hc-pwa-actions"><button id="homecare-install-action" class="btn gold small" type="button">Installa</button><button id="homecare-install-dismiss" class="hc-pwa-dismiss" type="button" aria-label="Chiudi suggerimento installazione">×</button></div>';
     document.body.appendChild(banner);
     document.getElementById('homecare-install-action').addEventListener('click', requestInstall);
     document.getElementById('homecare-install-dismiss').addEventListener('click', function () {
       writeLocal(DISMISS_KEY, APP_VERSION);
       syncInstallUi();
+    });
+  }
+
+  function bindModalClose(modal, setter) {
+    var closers = modal.querySelectorAll('[data-pwa-close]');
+    Array.prototype.forEach.call(closers, function (element) {
+      element.addEventListener('click', function () { setter(false); });
     });
   }
 
@@ -203,7 +183,7 @@
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'homecare-pwa-ios-title');
     modal.hidden = true;
-    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="/icon-192.png" alt="Home Care"><h2 id="homecare-pwa-ios-title">Aggiungi Home Care alla schermata Home</h2><ol><li>Tocca il pulsante <strong>Condividi</strong> di Safari.</li><li>Seleziona <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma con <strong>Aggiungi</strong>.</li></ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
+    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="' + ICON_URL + '" alt="Home Care"><h2 id="homecare-pwa-ios-title">Aggiungi Home Care alla schermata Home</h2><ol><li>Tocca il pulsante <strong>Condividi</strong> di Safari.</li><li>Seleziona <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma con <strong>Aggiungi</strong>.</li></ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
     document.body.appendChild(modal);
     bindModalClose(modal, setIosModal);
   }
@@ -224,16 +204,9 @@
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'homecare-pwa-android-title');
     modal.hidden = true;
-    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="/icon-192.png" alt="Home Care"><h2 id="homecare-pwa-android-title">' + title + '</h2><div class="hc-pwa-note">' + note + '</div><ol>' + steps + '</ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
+    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="' + ICON_URL + '" alt="Home Care"><h2 id="homecare-pwa-android-title">' + title + '</h2><div class="hc-pwa-note">' + note + '</div><ol>' + steps + '</ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
     document.body.appendChild(modal);
     bindModalClose(modal, setAndroidModal);
-  }
-
-  function bindModalClose(modal, setter) {
-    var closers = modal.querySelectorAll('[data-pwa-close]');
-    Array.prototype.forEach.call(closers, function (element) {
-      element.addEventListener('click', function () { setter(false); });
-    });
   }
 
   function setIosModal(open) {
@@ -263,7 +236,6 @@
     if (!document.body) return;
     ensureStyles();
     if (!appHasContent()) rescueBlankApp();
-
     bindExistingInstallButtons(document);
     if (!shouldShowInstall()) {
       hideInstallUi();
@@ -286,19 +258,13 @@
     var message = document.getElementById('homecare-install-message');
     var action = document.getElementById('homecare-install-action');
     var canPrompt = Boolean(getPrompt());
-    var ios = isIosDevice();
 
     if (banner) banner.hidden = false;
     if (message) {
-      if (canPrompt) {
-        message.textContent = 'Aggiungila al dispositivo e aprila come una vera app.';
-      } else if (ios) {
-        message.textContent = 'Su iPhone si installa da Safari: Condividi → Aggiungi alla schermata Home.';
-      } else if (isSamsungBrowser()) {
-        message.textContent = 'Su Samsung Internet il pulsante prova il prompt nativo; se non parte, usa il menu ⋮.';
-      } else {
-        message.textContent = 'Se il popup non parte, usa il menu del browser → Installa app.';
-      }
+      if (canPrompt) message.textContent = 'Aggiungila al dispositivo e aprila come una vera app.';
+      else if (isIosDevice()) message.textContent = 'Su iPhone si installa da Safari: Condividi → Aggiungi alla schermata Home.';
+      else if (isSamsungBrowser()) message.textContent = 'Su Samsung Internet il pulsante prova il prompt nativo; se non parte, usa il menu ⋮.';
+      else message.textContent = 'Se il popup non parte, usa il menu del browser → Installa app.';
     }
     if (action) action.textContent = 'Installa';
   }
@@ -310,7 +276,6 @@
 
   function requestInstall() {
     removeLocal(DISMISS_KEY);
-
     if (isStandalone()) {
       toast('Home Care è già installata su questo dispositivo.');
       syncInstallUi();
@@ -347,7 +312,6 @@
       setIosModal(true);
       return;
     }
-
     setAndroidModal(true);
   }
 
