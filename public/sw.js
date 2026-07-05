@@ -1,14 +1,15 @@
-const SW_VERSION = 'v17';
+const SW_VERSION = 'v18';
 const SHELL_CACHE = `home-care-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `home-care-runtime-${SW_VERSION}`;
 
 const CORE_ASSETS = [
   '/offline.html',
-  '/manifest.json',
-  '/icon.svg',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/apple-touch-icon.png'
+  '/manifest.json?v=32',
+  '/icon.svg?v=32',
+  '/icon-192.png?v=32',
+  '/icon-512.png?v=32',
+  '/apple-touch-icon.png?v=32',
+  '/favicon.ico?v=32'
 ];
 
 const STATIC_EXTENSIONS = /\.(?:css|js|png|jpg|jpeg|webp|svg|ico|json|woff2?)$/i;
