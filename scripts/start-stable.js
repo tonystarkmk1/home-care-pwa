@@ -4,6 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
+const PWA_ASSET_VERSION = 32;
 const INSTALL_SCRIPT_VERSION = 32;
 
 function runPatch(label, fn) {
@@ -16,12 +17,23 @@ function runPatch(label, fn) {
 
 runPatch('Icone PWA', () => require('./generate-pwa-png-icons.js'));
 
-runPatch('Apple touch icon PWA', () => {
-  const source = path.join(publicDir, 'icons', 'icon-180.png');
-  const fallback = path.join(publicDir, 'icon-192.png');
-  const target = path.join(publicDir, 'apple-touch-icon.png');
-  if (fs.existsSync(source)) fs.copyFileSync(source, target);
-  else if (fs.existsSync(fallback)) fs.copyFileSync(fallback, target);
+runPatch('Icone launcher Home Care', () => {
+  const copies = [
+    ['icons/icon-192.png', 'icon-192.png'],
+    ['icons/icon-512.png', 'icon-512.png'],
+    ['icons/icon-180.png', 'apple-touch-icon.png'],
+    ['apple-touch-icon.png', 'apple-touch-icon.png'],
+    ['favicon.ico', 'favicon.ico']
+  ];
+
+  for (const [from, to] of copies) {
+    const source = path.join(publicDir, from);
+    const target = path.join(publicDir, to);
+    if (fs.existsSync(source) && source !== target) {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(source, target);
+    }
+  }
 });
 
 runPatch('Patch Personalizzato', () => require('./patch-custom-plan-v1.js'));
@@ -45,12 +57,21 @@ runPatch('Patch installazione PWA', () => {
     }
   }
 
-  ensureHeadTag('rel="shortcut icon"', '<link rel="shortcut icon" href="/favicon.ico">');
-  ensureHeadTag('rel="icon" type="image/png" sizes="32x32"', '<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">');
-  ensureHeadTag('rel="icon" type="image/png" sizes="180x180"', '<link rel="icon" type="image/png" sizes="180x180" href="/icons/icon-180.png">');
-  ensureHeadTag('rel="icon" type="image/png" sizes="192x192"', '<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">');
-  ensureHeadTag('rel="icon" type="image/png" sizes="512x512"', '<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">');
-  ensureHeadTag('rel="apple-touch-icon"', '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">');
+  html = html.replace(/<link rel="manifest" href="\/manifest\.json(?:\?v=\d+)?">\s*/g, '');
+  html = html.replace(/<link rel="shortcut icon"[^>]*>\s*/g, '');
+  html = html.replace(/<link rel="icon"[^>]*>\s*/g, '');
+  html = html.replace(/<link rel="apple-touch-icon"[^>]*>\s*/g, '');
+  html = html.replace(/<meta name="msapplication-TileImage"[^>]*>\s*/g, '');
+  html = html.replace(/<meta name="msapplication-TileColor"[^>]*>\s*/g, '');
+
+  ensureHeadTag('rel="manifest"', `<link rel="manifest" href="/manifest.json?v=${PWA_ASSET_VERSION}">`);
+  ensureHeadTag('rel="icon" type="image/svg+xml"', `<link rel="icon" type="image/svg+xml" href="/icon.svg?v=${PWA_ASSET_VERSION}">`);
+  ensureHeadTag('rel="shortcut icon"', `<link rel="shortcut icon" href="/favicon.ico?v=${PWA_ASSET_VERSION}">`);
+  ensureHeadTag('rel="icon" type="image/png" sizes="192x192"', `<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=${PWA_ASSET_VERSION}">`);
+  ensureHeadTag('rel="icon" type="image/png" sizes="512x512"', `<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=${PWA_ASSET_VERSION}">`);
+  ensureHeadTag('rel="apple-touch-icon"', `<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=${PWA_ASSET_VERSION}">`);
+  ensureHeadTag('name="msapplication-TileImage"', `<meta name="msapplication-TileImage" content="/icon-192.png?v=${PWA_ASSET_VERSION}">`);
+  ensureHeadTag('name="msapplication-TileColor"', '<meta name="msapplication-TileColor" content="#06243a">');
   ensureHeadTag('name="mobile-web-app-capable"', '<meta name="mobile-web-app-capable" content="yes">');
   ensureHeadTag('name="apple-mobile-web-app-capable"', '<meta name="apple-mobile-web-app-capable" content="yes">');
   ensureHeadTag('name="apple-mobile-web-app-status-bar-style"', '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
@@ -85,7 +106,7 @@ runPatch('Patch installazione PWA', () => {
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: icone launcher Home Care, pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS, pagina pubblica immediata e protezione anti-schermo-bianco applicati.');
+  console.log('Avvio stabile: icone launcher versionate Home Care, pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS, pagina pubblica immediata e protezione anti-schermo-bianco applicati.');
 });
 
 require('../server3.js');
