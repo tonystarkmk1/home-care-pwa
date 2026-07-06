@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const indexPath = path.join(root, 'public', 'index.html');
 const serverPath = path.join(root, 'server3.js');
-const PLAN_SETTINGS_SCRIPT_VERSION = 4;
+const PLAN_SETTINGS_SCRIPT_VERSION = 5;
 
 function patchIndex() {
   let html = fs.readFileSync(indexPath, 'utf8');
@@ -102,7 +102,7 @@ app.patch('/api/admin/plan-settings/:id', auth(), adminOnly, async (req, res) =>
   if (!priceCents) return res.status(400).json({ error: 'Prezzo non valido' });
   const priceLabel = req.body.price_label || ((req.body.from_price ? 'da ' : '') + (priceCents / 100).toFixed(0) + ' €/mese');
   const featuresText = String(req.body.features_text || '').trim();
-  const features = featuresText ? featuresText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : [];
+  const features = featuresText ? featuresText.split(String.fromCharCode(10)).map((x) => x.replaceAll(String.fromCharCode(13), '').trim()).filter(Boolean) : [];
   const row = (await q('UPDATE plan_settings SET label=$2,price_cents=$3,price_label=$4,features_json=$5::jsonb,days=$6,from_price=$7,active=$8,sort_order=$9,updated_at=NOW() WHERE id=$1 RETURNING *', [req.params.id, label, priceCents, priceLabel, JSON.stringify(features), Number(req.body.days || current.days || 30), Boolean(req.body.from_price), Boolean(req.body.active), Number(req.body.sort_order || 0)])).rows[0];
   await loadPlanSettingsRuntime();
   res.json({ plan: serializePlan(row) });
