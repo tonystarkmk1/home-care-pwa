@@ -6,7 +6,7 @@ const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
 const PWA_ASSET_VERSION = 32;
 const INSTALL_SCRIPT_VERSION = 32;
-const CLIENT_ONBOARDING_SCRIPT_VERSION = 1;
+const CLIENT_ONBOARDING_SCRIPT_VERSION = 2;
 
 function runPatch(label, fn) {
   try {
