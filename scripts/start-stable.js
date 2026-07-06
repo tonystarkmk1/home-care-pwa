@@ -6,6 +6,7 @@ const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
 const PWA_ASSET_VERSION = 32;
 const INSTALL_SCRIPT_VERSION = 32;
+const CLIENT_ONBOARDING_SCRIPT_VERSION = 1;
 
 function runPatch(label, fn) {
   try {
@@ -41,7 +42,7 @@ runPatch('Patch Contatti', () => require('./patch-contacts-v1.js'));
 runPatch('Patch pagamenti piano/date', () => require('./patch-client-pay-date-v1.js'));
 runPatch('Patch Piani/Listino', () => require('./patch-plan-settings-v1.js'));
 
-runPatch('Patch installazione PWA', () => {
+runPatch('Patch installazione PWA e onboarding cliente', () => {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   if (!html.includes('viewport-fit=cover')) {
@@ -82,13 +83,17 @@ runPatch('Patch installazione PWA', () => {
     '<script>window.__homeCarePwaPrompt=null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__homeCarePwaPrompt=event;try{window.dispatchEvent(new Event("homecarebeforeinstallprompt"))}catch(e){}});</script>'
   );
 
-  // Non modifichiamo più le stringhe HTML interne dell'app per aggiungere il pulsante:
-  // install-app.js lo crea dinamicamente e prova prima il prompt nativo.
+  const clientOnboardingScript = `<script src="/client-onboarding-v1.js?v=${CLIENT_ONBOARDING_SCRIPT_VERSION}"></script>`;
+  if (!html.includes('/client-onboarding-v1.js')) {
+    html = html.replace('<script>\nconst app=', `${clientOnboardingScript}\n<script>\nconst app=`);
+  } else {
+    html = html.replace(/<script src="\/client-onboarding-v1\.js(?:\?v=\d+)?"><\/script>/g, clientOnboardingScript);
+  }
+
   html = html.replace(/<button class="btn light small hc-install-direct"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button data-install-app class="btn light small"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
 
-  // Boot più robusto: la pagina pubblica viene disegnata subito, senza aspettare API/config.
   const originalBoot = "async function boot(){try{S.config=await api('/api/config',{headers:{}})}catch(e){}if(!S.token)return publicHome();try{S.user=(await api('/api/auth/me')).user;shell()}catch(e){localStorage.removeItem('hc_token');publicHome(e.message)}}";
   const previousSafeBoot = "async function boot(){app.innerHTML='<main class=\"wrap\"><div class=\"card\"><h2>Caricamento Home Care...</h2><p class=\"muted\">Preparazione app in corso.</p></div></main>';const startupToken=S.token;const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);try{S.config=await withTimeout(api('/api/config',{headers:{}}),6000,'Configurazione temporaneamente non raggiungibile')}catch(e){}if(!startupToken)return publicHome();try{S.user=(await withTimeout(api('/api/auth/me'),8000,'Sessione non verificata. Accedi di nuovo.')).user;shell()}catch(e){localStorage.removeItem('hc_token');S.token=null;publicHome(e.message||'Sessione scaduta. Accedi di nuovo.')}}";
   const safeBoot = "async function boot(){const startupToken=S.token;const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);if(!startupToken){publicHome();api('/api/config',{headers:{}}).then(c=>{S.config=c}).catch(()=>{});return}app.innerHTML='<main class=\"wrap\"><div class=\"card\"><h2>Caricamento Home Care...</h2><p class=\"muted\">Preparazione area riservata in corso.</p></div></main>';try{S.config=await withTimeout(api('/api/config',{headers:{}}),5000,'Configurazione temporaneamente non raggiungibile')}catch(e){}try{S.user=(await withTimeout(api('/api/auth/me'),8000,'Sessione non verificata. Accedi di nuovo.')).user;shell()}catch(e){localStorage.removeItem('hc_token');S.token=null;publicHome(e.message||'Sessione scaduta. Accedi di nuovo.')}}";
@@ -96,6 +101,12 @@ runPatch('Patch installazione PWA', () => {
     html = html.replace(originalBoot, safeBoot);
   } else if (html.includes(previousSafeBoot)) {
     html = html.replace(previousSafeBoot, safeBoot);
+  }
+
+  const applyScripts = 'if(window.applyPlanSettingsV1)window.applyPlanSettingsV1();if(window.applyClientOnboardingV1)window.applyClientOnboardingV1();boot();';
+  html = html.replace(/if\(window\.applyPlanSettingsV1\)window\.applyPlanSettingsV1\(\);(?:if\(window\.applyClientOnboardingV1\)window\.applyClientOnboardingV1\(\);)?boot\(\);/g, applyScripts);
+  if (!html.includes('window.applyClientOnboardingV1')) {
+    html = html.replace('boot();', applyScripts);
   }
 
   const installScript = `<script src="/install-app.js?v=${INSTALL_SCRIPT_VERSION}"></script>`;
@@ -106,7 +117,7 @@ runPatch('Patch installazione PWA', () => {
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: icone launcher versionate Home Care, pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS, pagina pubblica immediata e protezione anti-schermo-bianco applicati.');
+  console.log('Avvio stabile: onboarding primo accesso cliente, icone launcher versionate, pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS e protezione anti-schermo-bianco applicati.');
 });
 
 require('../server3.js');
