@@ -4,7 +4,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const indexPath = path.join(root, 'public', 'index.html');
 const serverPath = path.join(root, 'server3.js');
-const PLAN_SETTINGS_SCRIPT_VERSION = 3;
+const PLAN_SETTINGS_SCRIPT_VERSION = 4;
 
 function patchIndex() {
   let html = fs.readFileSync(indexPath, 'utf8');
