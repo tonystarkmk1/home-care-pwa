@@ -1,5 +1,5 @@
 (function(){
-  const ONBOARDING_SCRIPT_VERSION = 1;
+  const ONBOARDING_SCRIPT_VERSION = 2;
 
   function customerHasAnyProperty(data){
     return Array.isArray(data?.properties) && data.properties.length > 0;
@@ -43,7 +43,7 @@
       <div>
         <span class="pill">Benvenuto${name}</span>
         <h1>Scegli il servizio e inoltra la richiesta</h1>
-        <p>Prima di parlare di pagamenti, scegli il piano più adatto e inserisci l’immobile da affidare a Home Care. Controlleremo la richiesta e ti confermeremo l’attivazione.</p>
+        <p>Scegli il piano più adatto alla tua casa, inserisci i dati dell’immobile e invia la richiesta. Home Care verificherà tutto e ti confermerà l’attivazione del servizio.</p>
         <div>
           <button class="btn gold" onclick="document.getElementById('client-plans')?.scrollIntoView({behavior:'smooth'})">Vedi i piani</button>
           <button class="btn light" onclick="clientSet('properties')">Inserisci immobile</button>
