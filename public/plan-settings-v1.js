@@ -1,5 +1,6 @@
 (function(){
   let planSettingsPromise = null;
+  const FEATURED_PLAN_ID = 'comfort';
   window.PLAN_SETTINGS = window.PLAN_SETTINGS || [];
   window.PLAN_FEATURES = window.PLAN_FEATURES || {};
 
@@ -9,6 +10,23 @@
 
   function activePlanIds(plans){
     return plans.filter((p)=>p.active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map((p)=>p.id);
+  }
+
+  function isFeaturedPlan(id){
+    const label = typeof P !== 'undefined' ? String(P[id] || '') : '';
+    return id === FEATURED_PLAN_ID || label.toLowerCase().includes('comfort');
+  }
+
+  function featuredBadge(id){
+    return isFeaturedPlan(id) ? '<div class="plan-badge" aria-label="Piano più scelto"><span aria-hidden="true">★</span> Più scelto</div>' : '';
+  }
+
+  function installPlanBadgeStyles(){
+    if(document.getElementById('homecare-plan-badge-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'homecare-plan-badge-styles';
+    style.textContent = `.plan{position:relative;overflow:visible}.plan.featured{border:2px solid var(--gold);box-shadow:0 18px 44px rgba(199,149,45,.22),0 10px 26px rgba(6,36,58,.07);transform:translateY(-2px)}.plan-badge{position:absolute;top:-13px;right:16px;z-index:3;display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:var(--gold);color:#071d30;border:1px solid rgba(6,36,58,.12);padding:7px 13px;font-size:12px;font-weight:1000;text-transform:uppercase;letter-spacing:.03em;box-shadow:0 10px 22px rgba(6,36,58,.18)}.plan-badge span{font-size:13px;line-height:1}@media(max-width:860px){.plan.featured{transform:none}.plan-badge{top:-11px;right:14px;font-size:11px;padding:6px 11px}}`;
+    document.head.appendChild(style);
   }
 
   async function loadPlanSettings(force){
@@ -29,17 +47,19 @@
       })
       .catch((error)=>{
         console.warn('Listino dinamico non caricato:', error.message);
+        installPlanBadgeStyles();
         return [];
       });
     return planSettingsPromise;
   }
 
   function overridePlanCards(){
+    installPlanBadgeStyles();
     window.planCards = planCards = function(){
       const ids = typeof PLAN_LIST !== 'undefined' ? PLAN_LIST : [];
       return `<div class="grid">${ids.map((id)=>{
         const features = (window.PLAN_FEATURES && window.PLAN_FEATURES[id] && window.PLAN_FEATURES[id].length) ? window.PLAN_FEATURES[id] : ['Servizio Home Care'];
-        return `<div class="card plan"><h3>${P[id]||id}</h3><div class="price">${PRICE[id]||''}</div><ul class="clean">${features.map((x)=>`<li>${esc(x)}</li>`).join('')}</ul><button class="btn teal" onclick="selectService('${id}')">Richiedi questo servizio</button></div>`;
+        return `<div class="card plan ${isFeaturedPlan(id)?'featured':''}">${featuredBadge(id)}<h3>${P[id]||id}</h3><div class="price">${PRICE[id]||''}</div><ul class="clean">${features.map((x)=>`<li>${esc(x)}</li>`).join('')}</ul><button class="btn teal" onclick="selectService('${id}')">Richiedi questo servizio</button></div>`;
       }).join('')}</div>`;
     };
   }
@@ -76,6 +96,7 @@
   }
 
   window.applyPlanSettingsV1 = function(){
+    installPlanBadgeStyles();
     const originalBoot = boot;
     boot = async function(){
       await loadPlanSettings(true);
@@ -83,4 +104,4 @@
       return originalBoot();
     };
   };
-})();
+})()
