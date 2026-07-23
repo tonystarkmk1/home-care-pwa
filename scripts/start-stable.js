@@ -5,7 +5,7 @@ const root = path.join(__dirname, '..');
 const publicDir = path.join(root, 'public');
 const indexPath = path.join(publicDir, 'index.html');
 const PWA_ASSET_VERSION = 32;
-const INSTALL_SCRIPT_VERSION = 32;
+const INSTALL_SCRIPT_VERSION = 33;
 const CLIENT_ONBOARDING_SCRIPT_VERSION = 2;
 
 function runPatch(label, fn) {
@@ -117,7 +117,7 @@ runPatch('Patch installazione PWA e onboarding cliente', () => {
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: onboarding primo accesso cliente, icone launcher versionate, pulsante installa, prompt nativo prioritario, fallback Android/Samsung, iOS e protezione anti-schermo-bianco applicati.');
+  console.log('Avvio stabile: onboarding primo accesso cliente, installazione PWA mobile-first, icone launcher versionate, prompt nativo prioritario e guida Installa app applicati.');
 });
 
 require('../server3.js');
