@@ -1,5 +1,5 @@
 (function () {
-  var APP_VERSION = 'home-care-pwa-v20';
+  var APP_VERSION = 'home-care-pwa-v21';
   var ICON_URL = '/icon-192.png?v=32';
   var DISMISS_KEY = 'homecare:pwa-install-dismissed';
   var RELOAD_KEY = 'homecare:sw-controller-reload';
@@ -29,9 +29,10 @@
       || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
   }
 
-  function isSamsungBrowser() {
-    return /SamsungBrowser/i.test(window.navigator.userAgent || '');
-  }
+  function isSamsungBrowser() { return /SamsungBrowser/i.test(window.navigator.userAgent || ''); }
+  function isEdgeAndroid() { return /EdgA/i.test(window.navigator.userAgent || ''); }
+  function isChromeAndroid() { return /Android/i.test(window.navigator.userAgent || '') && /Chrome/i.test(window.navigator.userAgent || '') && !isEdgeAndroid() && !isSamsungBrowser(); }
+  function isFirefoxAndroid() { return /Android/i.test(window.navigator.userAgent || '') && /Firefox/i.test(window.navigator.userAgent || ''); }
 
   function isMobileWidth() {
     try { return Boolean(window.matchMedia && window.matchMedia('(max-width: 860px)').matches); }
@@ -93,26 +94,26 @@
     var style = document.createElement('style');
     style.id = 'homecare-pwa-install-styles';
     style.textContent = [
-      '#homecare-install-banner{position:fixed;left:14px;right:14px;bottom:14px;z-index:999998;display:flex;gap:12px;align-items:center;justify-content:space-between;background:#fffdf7;color:#06243a;border:1px solid #e2d7c8;border-radius:20px;padding:12px;box-shadow:0 18px 46px rgba(6,36,58,.24);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
+      '#homecare-install-banner{position:fixed;left:14px;right:14px;bottom:14px;z-index:999998;display:flex;gap:12px;align-items:center;justify-content:space-between;background:#fffdf7;color:#06243a;border:1px solid #e2d7c8;border-radius:22px;padding:13px;box-shadow:0 18px 46px rgba(6,36,58,.24);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
       '#homecare-install-banner[hidden]{display:none!important}',
-      '#homecare-install-banner .hc-pwa-copy{display:flex;gap:10px;align-items:center;min-width:0}',
-      '#homecare-install-banner img{width:44px;height:44px;border-radius:13px;flex:0 0 auto}',
+      '#homecare-install-banner .hc-pwa-copy{display:flex;gap:11px;align-items:center;min-width:0}',
+      '#homecare-install-banner img{width:46px;height:46px;border-radius:14px;flex:0 0 auto}',
       '#homecare-install-banner strong{display:block;font-weight:1000}',
       '#homecare-install-banner small{display:block;color:#64748b;line-height:1.25}',
       '#homecare-install-banner .hc-pwa-actions{display:flex;gap:8px;align-items:center;flex:0 0 auto}',
       '#homecare-install-banner .hc-pwa-dismiss{border:0;background:transparent;color:#64748b;font-size:24px;line-height:1;cursor:pointer;padding:6px}',
-      '#homecare-pwa-ios-modal[hidden],#homecare-pwa-android-modal[hidden]{display:none!important}',
-      '#homecare-pwa-ios-modal,#homecare-pwa-android-modal{position:fixed;inset:0;z-index:999999;display:grid;place-items:center;padding:20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
-      '#homecare-pwa-ios-modal .hc-pwa-backdrop,#homecare-pwa-android-modal .hc-pwa-backdrop{position:absolute;inset:0;background:rgba(6,36,58,.48)}',
-      '#homecare-pwa-ios-modal .hc-pwa-card,#homecare-pwa-android-modal .hc-pwa-card{position:relative;max-width:430px;width:100%;background:#fffdf7;color:#06243a;border-radius:26px;padding:24px;border:1px solid #e2d7c8;box-shadow:0 24px 70px rgba(0,0,0,.32)}',
-      '#homecare-pwa-ios-modal img,#homecare-pwa-android-modal img{width:66px;height:66px;border-radius:18px}',
-      '#homecare-pwa-ios-modal h2,#homecare-pwa-android-modal h2{margin:12px 0 8px}',
-      '#homecare-pwa-ios-modal ol,#homecare-pwa-android-modal ol{line-height:1.65;padding-left:22px}',
-      '#homecare-pwa-ios-modal .hc-pwa-close,#homecare-pwa-android-modal .hc-pwa-close{position:absolute;right:12px;top:10px;border:0;background:transparent;font-size:28px;cursor:pointer;color:#64748b}',
-      '#homecare-pwa-android-modal .hc-pwa-note{background:#fff8e8;border-left:5px solid #c7952d;border-radius:14px;padding:10px 12px;margin:12px 0;color:#06243a}',
+      '#homecare-pwa-ios-modal[hidden],#homecare-pwa-native-guide-modal[hidden]{display:none!important}',
+      '#homecare-pwa-ios-modal,#homecare-pwa-native-guide-modal{position:fixed;inset:0;z-index:999999;display:grid;place-items:center;padding:18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
+      '#homecare-pwa-ios-modal .hc-pwa-backdrop,#homecare-pwa-native-guide-modal .hc-pwa-backdrop{position:absolute;inset:0;background:rgba(6,36,58,.55)}',
+      '#homecare-pwa-ios-modal .hc-pwa-card,#homecare-pwa-native-guide-modal .hc-pwa-card{position:relative;max-width:450px;width:100%;background:#fffdf7;color:#06243a;border-radius:28px;padding:24px;border:1px solid #e2d7c8;box-shadow:0 24px 70px rgba(0,0,0,.32)}',
+      '#homecare-pwa-ios-modal img,#homecare-pwa-native-guide-modal img{width:66px;height:66px;border-radius:18px}',
+      '#homecare-pwa-ios-modal h2,#homecare-pwa-native-guide-modal h2{margin:12px 0 8px}',
+      '#homecare-pwa-ios-modal ol,#homecare-pwa-native-guide-modal ol{line-height:1.65;padding-left:22px}',
+      '#homecare-pwa-ios-modal .hc-pwa-close,#homecare-pwa-native-guide-modal .hc-pwa-close{position:absolute;right:12px;top:10px;border:0;background:transparent;font-size:28px;cursor:pointer;color:#64748b}',
+      '#homecare-pwa-native-guide-modal .hc-pwa-note{background:#fff8e8;border-left:5px solid #c7952d;border-radius:14px;padding:10px 12px;margin:12px 0;color:#06243a}',
       '#homecare-pwa-toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(14px);z-index:1000000;background:#06243a;color:white;border-radius:999px;padding:11px 15px;font-weight:900;box-shadow:0 14px 32px rgba(6,36,58,.28);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;max-width:min(92vw,520px);text-align:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
       '#homecare-pwa-toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}',
-      '@media(max-width:560px){#homecare-install-banner{align-items:flex-start;flex-direction:column}.hc-pwa-actions{width:100%}#homecare-install-banner .btn{flex:1}}'
+      '@media(max-width:560px){#homecare-install-banner{align-items:stretch;flex-direction:column;left:12px;right:12px;bottom:12px;padding:14px}.hc-pwa-actions{width:100%}#homecare-install-banner .btn{flex:1;width:100%;font-size:16px;padding:13px 16px}.hc-pwa-dismiss{position:absolute;right:12px;top:12px}.hc-pwa-copy{padding-right:34px}}'
     ].join('\n');
     document.head.appendChild(style);
   }
@@ -159,7 +160,7 @@
     banner.id = 'homecare-install-banner';
     banner.setAttribute('aria-live', 'polite');
     banner.hidden = true;
-    banner.innerHTML = '<div class="hc-pwa-copy"><img src="' + ICON_URL + '" alt=""><span><strong>Installa Home Care</strong><small id="homecare-install-message">Aggiungila al dispositivo e aprila come una vera app.</small></span></div><div class="hc-pwa-actions"><button id="homecare-install-action" class="btn gold small" type="button">Installa</button><button id="homecare-install-dismiss" class="hc-pwa-dismiss" type="button" aria-label="Chiudi suggerimento installazione">×</button></div>';
+    banner.innerHTML = '<div class="hc-pwa-copy"><img src="' + ICON_URL + '" alt=""><span><strong>Installa Home Care</strong><small id="homecare-install-message">Aggiungila al dispositivo e aprila come una vera app.</small></span></div><div class="hc-pwa-actions"><button id="homecare-install-action" class="btn gold small" type="button">Installa app</button><button id="homecare-install-dismiss" class="hc-pwa-dismiss" type="button" aria-label="Chiudi suggerimento installazione">×</button></div>';
     document.body.appendChild(banner);
     document.getElementById('homecare-install-action').addEventListener('click', requestInstall);
     document.getElementById('homecare-install-dismiss').addEventListener('click', function () {
@@ -188,25 +189,54 @@
     bindModalClose(modal, setIosModal);
   }
 
-  function ensureAndroidModal() {
-    if (document.getElementById('homecare-pwa-android-modal')) return;
-    var samsung = isSamsungBrowser();
-    var title = samsung ? 'Installa Home Care da Samsung Internet' : 'Installa Home Care';
-    var note = samsung
-      ? 'Samsung Internet non sempre permette al sito di aprire il popup nativo. Se non parte automaticamente, completa l’installazione dal menu del browser.'
-      : 'Se il popup nativo non compare, completa l’installazione dal menu del browser.';
-    var steps = samsung
-      ? '<li>Tocca il menu <strong>⋮</strong> in basso a destra.</li><li>Scegli <strong>Aggiungi pagina a</strong> oppure <strong>Aggiungi a schermata Home</strong>.</li><li>Seleziona <strong>Schermata Home</strong> e conferma con <strong>Aggiungi</strong>.</li>'
-      : '<li>Tocca il menu <strong>⋮</strong> del browser.</li><li>Scegli <strong>Installa app</strong> oppure <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma con <strong>Installa</strong> o <strong>Aggiungi</strong>.</li>';
+  function nativeInstallGuideContent() {
+    if (isSamsungBrowser()) {
+      return {
+        title: 'Usa il comando Installa app',
+        note: 'Se la conferma automatica non compare, Samsung Internet usa il comando nativo dal menu del browser.',
+        steps: '<li>Tocca il menu <strong>☰ Menu</strong> oppure <strong>⋮</strong> in basso.</li><li>Cerca e tocca <strong>Installa app</strong>. Se non lo vedi, scegli <strong>Aggiungi pagina a</strong>.</li><li>Seleziona <strong>Schermata Home</strong> e conferma con <strong>Aggiungi</strong>.</li>'
+      };
+    }
+    if (isChromeAndroid()) {
+      return {
+        title: 'Usa il comando Installa app',
+        note: 'Chrome può mostrare la conferma automatica. Se non parte, usa il comando nativo del menu.',
+        steps: '<li>Tocca il menu <strong>⋮</strong> in alto a destra.</li><li>Tocca <strong>Installa app</strong>.</li><li>Conferma con <strong>Installa</strong>.</li>'
+      };
+    }
+    if (isEdgeAndroid()) {
+      return {
+        title: 'Usa il comando Installa app',
+        note: 'Microsoft Edge può installare Home Care dal menu del browser.',
+        steps: '<li>Tocca il menu <strong>⋮</strong>.</li><li>Tocca <strong>Installa app</strong> o <strong>Aggiungi al telefono</strong>.</li><li>Conferma l’installazione.</li>'
+      };
+    }
+    if (isFirefoxAndroid()) {
+      return {
+        title: 'Aggiungi Home Care alla schermata Home',
+        note: 'Firefox Android usa il comando del menu per aggiungere il sito alla schermata Home.',
+        steps: '<li>Tocca il menu <strong>⋮</strong>.</li><li>Scegli <strong>Installa</strong> oppure <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma l’aggiunta.</li>'
+      };
+    }
+    return {
+      title: 'Usa il comando nativo Installa app',
+      note: 'Il browser non ha aperto la conferma automatica. Puoi installare Home Care dal menu del browser.',
+      steps: '<li>Apri il menu del browser.</li><li>Cerca <strong>Installa app</strong> oppure <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma l’installazione o l’aggiunta.</li>'
+    };
+  }
+
+  function ensureNativeGuideModal() {
+    if (document.getElementById('homecare-pwa-native-guide-modal')) return;
+    var content = nativeInstallGuideContent();
     var modal = document.createElement('div');
-    modal.id = 'homecare-pwa-android-modal';
+    modal.id = 'homecare-pwa-native-guide-modal';
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', 'homecare-pwa-android-title');
+    modal.setAttribute('aria-labelledby', 'homecare-pwa-native-guide-title');
     modal.hidden = true;
-    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="' + ICON_URL + '" alt="Home Care"><h2 id="homecare-pwa-android-title">' + title + '</h2><div class="hc-pwa-note">' + note + '</div><ol>' + steps + '</ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
+    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="' + ICON_URL + '" alt="Home Care"><h2 id="homecare-pwa-native-guide-title">' + content.title + '</h2><div class="hc-pwa-note">' + content.note + '</div><ol>' + content.steps + '</ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
     document.body.appendChild(modal);
-    bindModalClose(modal, setAndroidModal);
+    bindModalClose(modal, setNativeGuideModal);
   }
 
   function setIosModal(open) {
@@ -217,9 +247,9 @@
     document.body.style.overflow = open ? 'hidden' : '';
   }
 
-  function setAndroidModal(open) {
-    ensureAndroidModal();
-    var modal = document.getElementById('homecare-pwa-android-modal');
+  function setNativeGuideModal(open) {
+    ensureNativeGuideModal();
+    var modal = document.getElementById('homecare-pwa-native-guide-modal');
     if (!modal) return;
     modal.hidden = !open;
     document.body.style.overflow = open ? 'hidden' : '';
@@ -245,7 +275,7 @@
     ensureHeaderButton();
     ensureBanner();
     ensureIosModal();
-    ensureAndroidModal();
+    ensureNativeGuideModal();
     bindExistingInstallButtons(document);
 
     var buttons = document.querySelectorAll('#homecare-install-header,.hc-install-direct,[data-pwa-manual-install]');
@@ -261,12 +291,11 @@
 
     if (banner) banner.hidden = false;
     if (message) {
-      if (canPrompt) message.textContent = 'Aggiungila al dispositivo e aprila come una vera app.';
+      if (canPrompt) message.textContent = 'Tocca Installa app: si aprirà la conferma nativa del browser.';
       else if (isIosDevice()) message.textContent = 'Su iPhone si installa da Safari: Condividi → Aggiungi alla schermata Home.';
-      else if (isSamsungBrowser()) message.textContent = 'Su Samsung Internet il pulsante prova il prompt nativo; se non parte, usa il menu ⋮.';
-      else message.textContent = 'Se il popup non parte, usa il menu del browser → Installa app.';
+      else message.textContent = 'Tocca Installa app: ti mostro il comando nativo da usare nel browser.';
     }
-    if (action) action.textContent = 'Installa';
+    if (action) action.textContent = 'Installa app';
   }
 
   function scheduleSync() {
@@ -298,11 +327,11 @@
           }
           syncInstallUi();
         }).catch(function () {
-          setAndroidModal(true);
+          setNativeGuideModal(true);
           syncInstallUi();
         });
       } catch (_) {
-        setAndroidModal(true);
+        setNativeGuideModal(true);
         syncInstallUi();
       }
       return;
@@ -312,7 +341,7 @@
       setIosModal(true);
       return;
     }
-    setAndroidModal(true);
+    setNativeGuideModal(true);
   }
 
   function registerServiceWorker() {
@@ -375,7 +404,7 @@
   window.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') {
       setIosModal(false);
-      setAndroidModal(false);
+      setNativeGuideModal(false);
     }
   });
 
