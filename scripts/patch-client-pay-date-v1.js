@@ -4,14 +4,15 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const indexPath = path.join(root, 'public', 'index.html');
 const serverPath = path.join(root, 'server3.js');
+const CLIENT_PAY_DATE_SCRIPT_VERSION = 4;
 
 function patchIndex() {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   if (!html.includes('/client-pay-date-v1.js')) {
-    html = html.replace('<script>\nconst app=', '<script src="/client-pay-date-v1.js?v=3"></script>\n<script>\nconst app=');
+    html = html.replace('<script>\nconst app=', `<script src="/client-pay-date-v1.js?v=${CLIENT_PAY_DATE_SCRIPT_VERSION}"></script>\n<script>\nconst app=`);
   } else {
-    html = html.replace(/\/client-pay-date-v1\.js\?v=\d+/g, '/client-pay-date-v1.js?v=3');
+    html = html.replace(/\/client-pay-date-v1\.js\?v=\d+/g, `/client-pay-date-v1.js?v=${CLIENT_PAY_DATE_SCRIPT_VERSION}`);
   }
 
   if (!html.includes('window.applyClientPayDateV1')) {
@@ -86,8 +87,9 @@ app.post('/api/client/plan-checkout', auth(), clientOnly, async (req, res) => {
   const cfg = packages[pkg] || packages.base;
   const property = (await q("SELECT * FROM properties WHERE customer_id=$1 AND active=TRUE ORDER BY approved_at DESC NULLS LAST, created_at DESC LIMIT 1", [customer.id])).rows[0];
   const usePropertyPrice = property && property.package_type === pkg && property.monthly_price_cents;
-  const customMonthly = pkg === 'personalizzato' ? cents(req.body.custom_monthly_price_euro) : null;
-  const monthlyCents = Number(customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));
+  const customerCustomMonthly = pkg === 'personalizzato' ? Number(customer.custom_monthly_price_cents || 0) : 0;
+  const customMonthly = pkg === 'personalizzato' && !customerCustomMonthly ? cents(req.body.custom_monthly_price_euro) : null;
+  const monthlyCents = Number(customerCustomMonthly || customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));
   if (!monthlyCents) return res.status(400).json({ error: 'Importo piano non valido' });
   let stripeCustomerId = customer.stripe_customer_id;
   if (!stripeCustomerId) {
@@ -98,7 +100,7 @@ app.post('/api/client/plan-checkout', auth(), clientOnly, async (req, res) => {
   const rawBase = PUBLIC_URL || appUrl(req);
   const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
   const annual = billing === 'annual';
-  const description = pkg === 'personalizzato' && req.body.custom_summary ? String(req.body.custom_summary).slice(0, 450) : (annual ? 'Pagamento annuale piano Home Care' : 'Abbonamento mensile Home Care');
+  const description = pkg === 'personalizzato' && (customer.custom_plan_summary || req.body.custom_summary) ? String(customer.custom_plan_summary || req.body.custom_summary).slice(0, 450) : (annual ? 'Pagamento annuale piano Home Care' : 'Abbonamento mensile Home Care');
   const priceData = annual
     ? { currency: 'eur', unit_amount: monthlyCents * 12, product_data: { name: 'Home Care annuale - ' + (cfg.label || pkg), description } }
     : { currency: 'eur', unit_amount: monthlyCents, recurring: { interval: 'month' }, product_data: { name: 'Home Care - ' + (cfg.label || pkg), description } };
@@ -159,7 +161,7 @@ app.post('/api/client/extra-payments/:id/pay', auth(), clientOnly, async (req, r
 try {
   patchIndex();
   patchServer();
-  console.log('Patch pagamenti piano, preventivi e date V3 applicata.');
+  console.log('Patch pagamenti piano, preventivi e date V4 applicata.');
 } catch (error) {
-  console.warn('Patch pagamenti piano, preventivi e date V3 non applicata:', error.message);
+  console.warn('Patch pagamenti piano, preventivi e date V4 non applicata:', error.message);
 }
