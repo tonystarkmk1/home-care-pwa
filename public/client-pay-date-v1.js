@@ -53,6 +53,10 @@
     return `<select id="clientPlanSelect">${fixedPlans().map((key)=>`<option value="${key}" ${selected===key?'selected':''}>${P[key]} - ${PRICE[key] || ''}</option>`).join('')}</select>`;
   }
 
+  function hasAdminCustomPrice(customer){
+    return Number(customer?.custom_monthly_price_cents || 0) > 0;
+  }
+
   function customMonthlyTotal(){
     const box = document.getElementById('clientCustomPlanBox');
     if(!box) return 39;
@@ -66,7 +70,10 @@
     return total;
   }
 
-  function customPlanPanel(){
+  function customPlanPanel(customer){
+    if(hasAdminCustomPrice(customer)) {
+      return `<div id="clientCustomPlanBox" class="notice success" style="margin-top:12px"><h3>Piano personalizzato confermato</h3><p><b>Prezzo mensile: ${money(customer.custom_monthly_price_cents)}</b></p>${customer.custom_plan_summary?`<p class="muted" style="white-space:pre-wrap">${esc(customer.custom_plan_summary)}</p>`:''}<p class="muted">Questo importo è stato impostato da Home Care in base ai servizi concordati.</p></div>`;
+    }
     return `<div id="clientCustomPlanBox" class="notice" style="display:none;margin-top:12px">
       <h3>Configura il piano Personalizzato</h3>
       <p>Base obbligatorio: <b>39 €/mese</b>, con 1 controllo mensile incluso.</p>
@@ -83,7 +90,7 @@
 
   function selectedCustomSummary(){
     const box = document.getElementById('clientCustomPlanBox');
-    if(!box) return null;
+    if(!box || box.classList.contains('success')) return null;
     const controls = Math.max(0, Number(box.querySelector('[name="renew_extra_controls"]')?.value || 0));
     const monthly = [];
     if(controls>0) monthly.push(`${controls} controllo/i aggiuntivo/i mensile/i (+${controls*20} €/mese)`);
@@ -104,7 +111,7 @@
     const box = document.getElementById('clientCustomPlanBox');
     const total = document.getElementById('renewCustomTotal');
     if(!select || !box) return;
-    box.style.display = select.value === 'personalizzato' ? 'block' : 'none';
+    if(!box.classList.contains('success')) box.style.display = select.value === 'personalizzato' ? 'block' : 'none';
     if(total) total.textContent = customMonthlyTotal() + ' €/mese';
   }
 
@@ -113,7 +120,8 @@
     const current = normalizePlan(rawCurrent);
     const paid = Boolean(d.customer?.payment_valid);
     const currentName = P[current] || P[rawCurrent] || 'Base';
-    return `<div class="card" style="margin-top:14px"><h2>${paid?'Gestisci piano':'Riattiva il servizio'}</h2>${paid?`<div class="notice success"><b>Piano attivo: ${currentName}</b><br>Puoi cambiare piano o rinnovare scegliendo una delle opzioni qui sotto.</div>`:`<div class="notice error"><b>Piano scaduto / da riattivare: ${currentName}</b><br>Il servizio resta sospeso finché il pagamento non viene riattivato. Puoi pagare subito il piano scaduto oppure scegliere un nuovo piano.</div>`}<label>Piano da pagare / attivare</label>${planSelectHtml(current)}${customPlanPanel()}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn gold" onclick="payClientPlan('monthly')">Paga mensile</button><button class="btn teal" onclick="payClientPlan('annual')">Paga annuale</button></div><p class="muted">Il pagamento mensile attiva o riattiva l’abbonamento. Il pagamento annuale calcola 12 mensilità.</p></div>`;
+    const customInfo = current === 'personalizzato' && hasAdminCustomPrice(d.customer) ? `<div class="notice success"><b>Piano personalizzato Home Care</b><br>Prezzo mensile confermato: <b>${money(d.customer.custom_monthly_price_cents)}</b>.</div>` : '';
+    return `<div class="card" style="margin-top:14px"><h2>${paid?'Gestisci piano':'Riattiva il servizio'}</h2>${customInfo}${paid?`<div class="notice success"><b>Piano attivo: ${currentName}</b><br>Puoi cambiare piano o rinnovare scegliendo una delle opzioni qui sotto.</div>`:`<div class="notice error"><b>Piano scaduto / da riattivare: ${currentName}</b><br>Il servizio resta sospeso finché il pagamento non viene riattivato. Puoi pagare subito il piano scaduto oppure scegliere un nuovo piano.</div>`}<label>Piano da pagare / attivare</label>${planSelectHtml(current)}${customPlanPanel(d.customer)}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn gold" onclick="payClientPlan('monthly')">Paga mensile</button><button class="btn teal" onclick="payClientPlan('annual')">Paga annuale</button></div><p class="muted">Il pagamento mensile attiva o riattiva l’abbonamento. Il pagamento annuale calcola 12 mensilità.</p></div>`;
   }
 
   function extraPaymentButton(payment){
@@ -140,7 +148,8 @@
       const select = document.getElementById('clientPlanSelect');
       const package_type = select ? select.value : undefined;
       const body = { billing, package_type };
-      if(package_type === 'personalizzato') {
+      const box = document.getElementById('clientCustomPlanBox');
+      if(package_type === 'personalizzato' && box && !box.classList.contains('success')) {
         const summary = selectedCustomSummary();
         body.custom_monthly_price_euro = summary ? summary.monthlyTotal : 39;
         body.custom_summary = summary ? `Piano Personalizzato\nTotale mensile: ${summary.monthlyTotal} €/mese\nServizi mensili:\n${summary.monthly.length ? summary.monthly.map(x=>'• '+x).join('\n') : '• Nessun servizio aggiuntivo'}\nExtra:\n${summary.extras.length ? summary.extras.map(x=>'• '+x).join('\n') : '• Nessun extra'}` : '';
