@@ -1,0 +1,127 @@
+name: Materialize Home Care V2
+
+on:
+  push:
+    branches: [agent/home-care-production-rebuild]
+    paths:
+      - ".github/workflows/materialize-home-care-v2.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-home-care-v2
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_TREE_SHA: fcf3c1be5bc9c22e487b1fe1016f3220bac6cc20
+      SOURCE_ARCHIVE_SHA256: 96423244756f3e332fcd406dfe95f40d13ddde6cd32ce1a494e8625a316e9694
+      EXTRA_BLOB_SHAS: c87447ddcd53ba97f81b484cf597caff928d2822 ca50eabb14846d5d0cebca672512c5ea81c08684 ac59c1ddda02ac11ea0faafd0345a0ef098ffd0e f8d4ea4f9998e7f52b2390d6c3bfbdf4d86913ab 098794728c6bc6618fa113af11a2e2ef0dd393ec 7283399cf7d1fcf5b234e5a85795202ef796831c b44f7294591773473330bbdd1783faef370b73e1 22c036197baa8e4fbb3926b61a85991520264472 7cc0610624ce9b56b753d42021af4831b7b9b20d
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/home-care-production-rebuild
+          fetch-depth: 0
+
+      - name: Rebuild source package from verified Git objects
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import urllib.request
+
+          repository = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          tree_sha = os.environ['SOURCE_TREE_SHA']
+          extra_shas = os.environ['EXTRA_BLOB_SHAS'].split()
+
+          def github_api(path):
+              request = urllib.request.Request(
+                  f'https://api.github.com{path}',
+                  headers={
+                      'Accept': 'application/vnd.github+json',
+                      'Authorization': f'Bearer {token}',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'User-Agent': 'home-care-v2-materializer',
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  return json.load(response)
+
+          tree = github_api(f'/repos/{repository}/git/trees/{tree_sha}?recursive=1')
+          entries = sorted(
+              (
+                  item for item in tree.get('tree', [])
+                  if item.get('type') == 'blob'
+                  and item.get('path', '').startswith('.bootstrap/part-')
+              ),
+              key=lambda item: item['path'],
+          )
+          if not entries:
+              raise SystemExit('Nessun frammento trovato nell’albero Git verificato')
+
+          with open('/tmp/home-care-v2.b64', 'wb') as output:
+              for item in entries:
+                  blob = github_api(f"/repos/{repository}/git/blobs/{item['sha']}")
+                  output.write(base64.b64decode(blob['content']))
+              for sha in extra_shas:
+                  blob = github_api(f'/repos/{repository}/git/blobs/{sha}')
+                  output.write(base64.b64decode(blob['content']))
+
+          print(f'Frammenti Git ricostruiti: {len(entries) + len(extra_shas)}')
+          PY
+          base64 --decode /tmp/home-care-v2.b64 > /tmp/home-care-v2.tar.xz
+          echo "$SOURCE_ARCHIVE_SHA256  /tmp/home-care-v2.tar.xz" | sha256sum -c -
+          rm -rf /tmp/home-care-v2
+          mkdir -p /tmp/home-care-v2
+          tar -xJf /tmp/home-care-v2.tar.xz -C /tmp/home-care-v2
+
+      - name: Replace branch contents with Home Care V2
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/home-care-v2/. .
+          rm -f .github/workflows/bootstrap-lockfile.yml
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+          registry-url: https://registry.npmjs.org
+
+      - name: Generate deterministic lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install dependencies
+        run: npm ci --no-fund --no-audit
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Static checks
+        run: npm run check
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Commit materialized V2
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Ricostruisce Home Care PWA V2 mobile-first e sicura"
+          git push origin HEAD:agent/home-care-production-rebuild
