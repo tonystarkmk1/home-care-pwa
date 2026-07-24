@@ -154,9 +154,9 @@ app.post('/api/admin/customer-custom-plans/:id/archive', auth(), adminOnly, asyn
   }
 
   const oldMonthly = "const monthlyCents = Number(customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));";
-  const newMonthly = "const customerCustomMonthly = pkg === 'personalizzato' ? Number(customer.custom_monthly_price_cents || 0) : 0;\\n  const monthlyCents = Number(customerCustomMonthly || customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));";
+  const newMonthly = "const customerCustomMonthly = pkg === 'personalizzato' ? Number(customer.custom_monthly_price_cents || 0) : 0;" + String.fromCharCode(10) + "  const monthlyCents = Number(customerCustomMonthly || customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));";
   if (code.includes(oldMonthly) && !code.includes('customerCustomMonthly')) {
-    code = code.replace(oldMonthly, newMonthly.replace('\\\\n', '\\n'));
+    code = code.replace(oldMonthly, newMonthly);
   }
 
   fs.writeFileSync(serverPath, code);
