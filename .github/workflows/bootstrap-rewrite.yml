@@ -59,6 +59,7 @@ jobs:
           base64 --decode /tmp/home-care-rewrite.tgz.b64 > /tmp/home-care-rewrite.tgz
           echo "8b4971e4490a0dcdf1dfb0c540d9c870af1609e24a6af9715a961f5ed385a134  /tmp/home-care-rewrite.tgz" | sha256sum -c -
           tar -xzf /tmp/home-care-rewrite.tgz -C .
+          rm -f .github/workflows/ci.yml
           rm -f \
             scripts/patch-install-button-only.js \
             scripts/patch-custom-plan-v1.js \
@@ -72,8 +73,6 @@ jobs:
             public/plan-settings-v1.js \
             public/client-onboarding-v1.js \
             public/admin-custom-pricing-v1.js
-          rm -rf .bootstrap
-          rm -f .github/workflows/bootstrap-rewrite.yml
 
       - name: Configura Node.js
         uses: actions/setup-node@v4
@@ -96,13 +95,17 @@ jobs:
       - name: Test integrazione e sicurezza
         run: npm test
 
+      - name: Audit dipendenze di produzione
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Registra il refactoring verificato
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -A -- . ':(exclude).bootstrap' ':(exclude).github/workflows/bootstrap-rewrite.yml'
           git diff --cached --stat
+          git diff --cached --quiet && { echo "Nessuna modifica da registrare"; exit 0; }
           git commit -m "Secure Home Care and rebuild mobile-first PWA"
           git push origin HEAD:agent/secure-mobile-first-pwa
