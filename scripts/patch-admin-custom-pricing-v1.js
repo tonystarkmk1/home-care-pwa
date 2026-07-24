@@ -64,13 +64,14 @@ async function ensureCustomerCustomPlansTable() {
 function customPlanSummary(plan) {
   let services = [];
   try { services = Array.isArray(plan.services_json) ? plan.services_json : JSON.parse(plan.services_json || '[]'); } catch (_) {}
+  const nl = String.fromCharCode(10);
   const lines = services.map((item) => '- ' + item.label + ': €' + Number(item.price_euro || 0).toFixed(2));
   return [
     plan.title,
     'Prezzo mensile finale: €' + (Number(plan.final_price_cents || 0) / 100).toFixed(2),
-    lines.length ? 'Servizi inclusi:\n' + lines.join('\n') : '',
+    lines.length ? 'Servizi inclusi:' + nl + lines.join(nl) : '',
     plan.notes || ''
-  ].filter(Boolean).join('\n');
+  ].filter(Boolean).join(nl);
 }
 
 ensureCustomerCustomPlansTable().catch((error) => console.warn('Piani personalizzati cliente non inizializzati:', error.message));
@@ -153,9 +154,9 @@ app.post('/api/admin/customer-custom-plans/:id/archive', auth(), adminOnly, asyn
   }
 
   const oldMonthly = "const monthlyCents = Number(customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));";
-  const newMonthly = "const customerCustomMonthly = pkg === 'personalizzato' ? Number(customer.custom_monthly_price_cents || 0) : 0;\n  const monthlyCents = Number(customerCustomMonthly || customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));";
+  const newMonthly = "const customerCustomMonthly = pkg === 'personalizzato' ? Number(customer.custom_monthly_price_cents || 0) : 0;\\n  const monthlyCents = Number(customerCustomMonthly || customMonthly || (usePropertyPrice ? property.monthly_price_cents : cfg.priceCents));";
   if (code.includes(oldMonthly) && !code.includes('customerCustomMonthly')) {
-    code = code.replace(oldMonthly, newMonthly);
+    code = code.replace(oldMonthly, newMonthly.replace('\\\\n', '\\n'));
   }
 
   fs.writeFileSync(serverPath, code);
