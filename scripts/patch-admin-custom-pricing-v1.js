@@ -27,7 +27,7 @@ function patchIndex() {
 function patchServer() {
   let code = fs.readFileSync(serverPath, 'utf8');
 
-  if (!code.includes('custom_monthly_price_cents')) {
+  if (!code.includes('function ensureCustomerCustomPlansTable')) {
     const marker = "app.get('/api/health', (req, res) => res.json({ ok: true, app: 'home-care-pwa' }));";
     const bootstrap = `
 async function ensureCustomerCustomPlansTable() {
