@@ -7,6 +7,7 @@ const indexPath = path.join(publicDir, 'index.html');
 const PWA_ASSET_VERSION = 32;
 const INSTALL_SCRIPT_VERSION = 33;
 const CLIENT_ONBOARDING_SCRIPT_VERSION = 2;
+const ADMIN_CUSTOM_PRICING_SCRIPT_VERSION = 1;
 
 function runPatch(label, fn) {
   try {
@@ -41,6 +42,7 @@ runPatch('Patch Personalizzato', () => require('./patch-custom-plan-v1.js'));
 runPatch('Patch Contatti', () => require('./patch-contacts-v1.js'));
 runPatch('Patch pagamenti piano/date', () => require('./patch-client-pay-date-v1.js'));
 runPatch('Patch Piani/Listino', () => require('./patch-plan-settings-v1.js'));
+runPatch('Patch piani personalizzati cliente', () => require('./patch-admin-custom-pricing-v1.js'));
 
 runPatch('Patch installazione PWA e onboarding cliente', () => {
   let html = fs.readFileSync(indexPath, 'utf8');
@@ -90,6 +92,13 @@ runPatch('Patch installazione PWA e onboarding cliente', () => {
     html = html.replace(/<script src="\/client-onboarding-v1\.js(?:\?v=\d+)?"><\/script>/g, clientOnboardingScript);
   }
 
+  const adminCustomPricingScript = `<script src="/admin-custom-pricing-v1.js?v=${ADMIN_CUSTOM_PRICING_SCRIPT_VERSION}"></script>`;
+  if (!html.includes('/admin-custom-pricing-v1.js')) {
+    html = html.replace('<script>\nconst app=', `${adminCustomPricingScript}\n<script>\nconst app=`);
+  } else {
+    html = html.replace(/<script src="\/admin-custom-pricing-v1\.js(?:\?v=\d+)?"><\/script>/g, adminCustomPricingScript);
+  }
+
   html = html.replace(/<button class="btn light small hc-install-direct"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button data-install-app class="btn light small"[^>]*>Installa app<\/button>\s*/g, '');
   html = html.replace(/<button class="btn light small" onclick="installApp\(\)">Installa app<\/button>\s*/g, '');
@@ -103,9 +112,9 @@ runPatch('Patch installazione PWA e onboarding cliente', () => {
     html = html.replace(previousSafeBoot, safeBoot);
   }
 
-  const applyScripts = 'if(window.applyPlanSettingsV1)window.applyPlanSettingsV1();if(window.applyClientOnboardingV1)window.applyClientOnboardingV1();boot();';
-  html = html.replace(/if\(window\.applyPlanSettingsV1\)window\.applyPlanSettingsV1\(\);(?:if\(window\.applyClientOnboardingV1\)window\.applyClientOnboardingV1\(\);)?boot\(\);/g, applyScripts);
-  if (!html.includes('window.applyClientOnboardingV1')) {
+  const applyScripts = 'if(window.applyPlanSettingsV1)window.applyPlanSettingsV1();if(window.applyClientOnboardingV1)window.applyClientOnboardingV1();if(window.applyAdminCustomPricingV1)window.applyAdminCustomPricingV1();boot();';
+  html = html.replace(/if\(window\.applyPlanSettingsV1\)window\.applyPlanSettingsV1\(\);(?:if\(window\.applyClientOnboardingV1\)window\.applyClientOnboardingV1\(\);)?(?:if\(window\.applyAdminCustomPricingV1\)window\.applyAdminCustomPricingV1\(\);)?boot\(\);/g, applyScripts);
+  if (!html.includes('window.applyAdminCustomPricingV1')) {
     html = html.replace('boot();', applyScripts);
   }
 
@@ -117,7 +126,7 @@ runPatch('Patch installazione PWA e onboarding cliente', () => {
   }
 
   fs.writeFileSync(indexPath, html);
-  console.log('Avvio stabile: onboarding primo accesso cliente, installazione PWA mobile-first, icone launcher versionate, prompt nativo prioritario e guida Installa app applicati.');
+  console.log('Avvio stabile: piani personalizzati cliente, onboarding primo accesso, installazione PWA mobile-first e icone launcher applicati.');
 });
 
 require('../server3.js');
