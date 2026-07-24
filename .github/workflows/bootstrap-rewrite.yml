@@ -59,6 +59,13 @@ jobs:
           base64 --decode /tmp/home-care-rewrite.tgz.b64 > /tmp/home-care-rewrite.tgz
           echo "8b4971e4490a0dcdf1dfb0c540d9c870af1609e24a6af9715a961f5ed385a134  /tmp/home-care-rewrite.tgz" | sha256sum -c -
           tar -xzf /tmp/home-care-rewrite.tgz -C .
+          node - <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.dependencies.express = '4.22.2';
+          pkg.dependencies.morgan = '1.11.0';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
           rm -f .github/workflows/ci.yml
           rm -f \
             scripts/patch-install-button-only.js \
