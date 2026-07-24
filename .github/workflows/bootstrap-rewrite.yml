@@ -1,0 +1,104 @@
+name: Applica refactoring Home Care
+
+on:
+  push:
+    branches:
+      - agent/secure-mobile-first-pwa
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-home-care-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Ricostruisci, verifica e pubblica
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: homecare
+          POSTGRES_PASSWORD: homecare
+          POSTGRES_DB: homecare_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U homecare -d homecare_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://homecare:homecare@127.0.0.1:5432/homecare_test
+      JWT_SECRET: home-care-bootstrap-secret-with-more-than-thirty-two-characters
+      ADMIN_NAME: Admin Bootstrap
+      ADMIN_EMAIL: admin-bootstrap@example.test
+      ADMIN_PASSWORD: Admin-password-Bootstrap-2026!
+      STRIPE_WEBHOOK_SECRET: whsec_bootstrap_test
+      REGISTRATION_ENABLED: "true"
+    steps:
+      - name: Scarica il branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verifica e applica l'archivio
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/part-* > /tmp/home-care-rewrite.tgz.b64
+          echo "583dec9f48e771d9610922cf3e4debc85a100721cd598e47a0a4ed42bd205122  /tmp/home-care-rewrite.tgz.b64" | sha256sum -c -
+          base64 --decode /tmp/home-care-rewrite.tgz.b64 > /tmp/home-care-rewrite.tgz
+          echo "8b4971e4490a0dcdf1dfb0c540d9c870af1609e24a6af9715a961f5ed385a134  /tmp/home-care-rewrite.tgz" | sha256sum -c -
+          tar -xzf /tmp/home-care-rewrite.tgz -C .
+          rm -f \
+            scripts/patch-install-button-only.js \
+            scripts/patch-custom-plan-v1.js \
+            scripts/patch-contacts-v1.js \
+            scripts/patch-client-pay-date-v1.js \
+            scripts/patch-plan-settings-v1.js \
+            scripts/patch-admin-custom-pricing-v1.js \
+            public/custom-plan-v1.js \
+            public/contacts-v1.js \
+            public/client-pay-date-v1.js \
+            public/plan-settings-v1.js \
+            public/client-onboarding-v1.js \
+            public/admin-custom-pricing-v1.js
+          rm -rf .bootstrap
+          rm -f .github/workflows/bootstrap-rewrite.yml
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Genera il lockfile e installa
+        run: npm install --ignore-scripts
+
+      - name: Controlli sintattici, statici e PWA
+        run: npm run check
+
+      - name: Verifica migrazioni e seed idempotenti
+        run: |
+          npm run migrate
+          npm run migrate
+          npm run seed
+          npm run seed
+
+      - name: Test integrazione e sicurezza
+        run: npm test
+
+      - name: Registra il refactoring verificato
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --stat
+          git commit -m "Secure Home Care and rebuild mobile-first PWA"
+          git push origin HEAD:agent/secure-mobile-first-pwa
