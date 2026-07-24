@@ -95,8 +95,28 @@ jobs:
       - name: Test integrazione e sicurezza
         run: npm test
 
-      - name: Audit dipendenze di produzione
-        run: npm audit --omit=dev --audit-level=high
+      - name: Genera report audit
+        shell: bash
+        run: npm audit --omit=dev --json > audit-report.json || true
+
+      - name: Salva report audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-care-audit
+          path: audit-report.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Verifica audit dipendenze di produzione
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('audit-report.json', 'utf8'));
+          const meta = report.metadata?.vulnerabilities || {};
+          console.log(JSON.stringify({ vulnerabilities: report.vulnerabilities, metadata: meta }, null, 2));
+          if ((meta.high || 0) + (meta.critical || 0) > 0) process.exit(1);
+          NODE
 
       - name: Registra il refactoring verificato
         shell: bash
@@ -104,6 +124,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f audit-report.json
           git add -A -- . ':(exclude).bootstrap' ':(exclude).github/workflows/bootstrap-rewrite.yml'
           git diff --cached --stat
           git diff --cached --quiet && { echo "Nessuna modifica da registrare"; exit 0; }
