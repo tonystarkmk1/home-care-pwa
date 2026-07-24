@@ -4,12 +4,15 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const indexPath = path.join(root, 'public', 'index.html');
 const serverPath = path.join(root, 'server3.js');
+const CONTACTS_SCRIPT_VERSION = 2;
 
 function patchIndex() {
   let html = fs.readFileSync(indexPath, 'utf8');
 
   if (!html.includes('/contacts-v1.js')) {
-    html = html.replace('<script>\nconst app=', '<script src="/contacts-v1.js?v=1"></script>\n<script>\nconst app=');
+    html = html.replace('<script>\nconst app=', `<script src="/contacts-v1.js?v=${CONTACTS_SCRIPT_VERSION}"></script>\n<script>\nconst app=`);
+  } else {
+    html = html.replace(/\/contacts-v1\.js\?v=\d+/g, `/contacts-v1.js?v=${CONTACTS_SCRIPT_VERSION}`);
   }
 
   if (!html.includes('window.applyContactsV1')) {
