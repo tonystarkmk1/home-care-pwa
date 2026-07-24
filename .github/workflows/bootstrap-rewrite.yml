@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/secure-mobile-first-pwa
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -44,6 +47,7 @@ jobs:
       - name: Scarica il branch
         uses: actions/checkout@v4
         with:
+          ref: agent/secure-mobile-first-pwa
           fetch-depth: 0
 
       - name: Verifica e applica l'archivio
