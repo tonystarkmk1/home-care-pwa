@@ -10,6 +10,7 @@ on:
       - 'public/simple-ui-v44.css'
       - 'tests/simple-ui-v44.test.js'
       - 'scripts/apply-simple-ui-v44.js'
+      - 'scripts/fix-simple-ui-v44-validator.js'
       - '.github/workflows/apply-simple-ui-v44.yml'
   pull_request:
     branches:
@@ -20,6 +21,7 @@ on:
       - 'public/simple-ui-v44.css'
       - 'tests/simple-ui-v44.test.js'
       - 'scripts/apply-simple-ui-v44.js'
+      - 'scripts/fix-simple-ui-v44-validator.js'
       - '.github/workflows/apply-simple-ui-v44.yml'
 
 permissions:
@@ -74,7 +76,9 @@ jobs:
           cache: npm
 
       - name: Applica la nuova organizzazione dell'interfaccia
-        run: node scripts/apply-simple-ui-v44.js
+        run: |
+          node scripts/apply-simple-ui-v44.js
+          node scripts/fix-simple-ui-v44-validator.js
 
       - name: Aggiorna lockfile e installa le dipendenze
         run: |
@@ -117,6 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f scripts/apply-simple-ui-v44.js
+          rm -f scripts/fix-simple-ui-v44-validator.js
           rm -f .github/workflows/apply-simple-ui-v44.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
