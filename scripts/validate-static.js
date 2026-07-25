@@ -55,9 +55,8 @@ assert.match(runtime, /serviceWorker\.getRegistrations/);
 assert.match(installer, /beforeinstallprompt/);
 assert.match(installer, /iphone\|ipad\|ipod/i);
 assert.match(installer, /samsungbrowser/i);
-assert.match(installer, /reloadForUpdate/);
 assert.match(installer, /installLabelState/);
-assert.doesNotMatch(installer, /controllerchange[\s\S]{0,200}window\.location\.reload\(\)(?![\s\S]*reloadForUpdate)/);
+assert.match(installer, /controllerchange[\s\S]{0,180}if \(!reloadForUpdate\) return;[\s\S]{0,180}window\.location\.reload\(\)/);
 
 assert.match(worker, /home-care-v43/);
 assert.match(worker, /networkFirst/);
