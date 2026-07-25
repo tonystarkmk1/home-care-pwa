@@ -54,7 +54,7 @@ function installOperationalFeatures(dependencies) {
     const property = (await q(
       `SELECT p.*,c.name customer_name,c.email customer_email
          FROM properties p JOIN customers c ON c.id=p.customer_id
-        WHERE p.id=$1`,
+        WHERE p.id=$1 FOR UPDATE OF p`,
       [propertyId],
       client
     )).rows[0];
@@ -87,12 +87,22 @@ function installOperationalFeatures(dependencies) {
     if (overlap) throw new HttpError(409, 'Esiste già un periodo di occupazione sovrapposto', 'OCCUPANCY_OVERLAP');
   }
 
-  async function adjustNextCheck(client, propertyId) {
-    await q(
-      `UPDATE properties
-          SET next_check_date=home_care_next_available_date(id,GREATEST(next_check_date,CURRENT_DATE)),updated_at=NOW()
-        WHERE id=$1`,
+  async function recalculateNextCheck(client, propertyId) {
+    const scheduling = (await q(
+      `SELECT ps.days,MAX(ch.completed_at::date)::text last_completed
+         FROM properties p JOIN plan_settings ps ON ps.id=p.package_type
+         LEFT JOIN checks ch ON ch.property_id=p.id AND ch.status='done'
+        WHERE p.id=$1 GROUP BY ps.days`,
       [propertyId],
+      client
+    )).rows[0];
+    if (!scheduling) return;
+    const candidate = scheduling.last_completed
+      ? new Date(Date.parse(`${scheduling.last_completed}T00:00:00Z`) + Number(scheduling.days || 30) * 86_400_000).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+    await q(
+      `UPDATE properties SET next_check_date=home_care_next_available_date(id,$2::date),updated_at=NOW() WHERE id=$1`,
+      [propertyId, candidate],
       client
     );
   }
@@ -129,7 +139,7 @@ function installOperationalFeatures(dependencies) {
         [propertyId, startDate, endDate, note, adminMode ? 'admin' : 'client', req.user.id],
         client
       )).rows[0];
-      await adjustNextCheck(client, propertyId);
+      await recalculateNextCheck(client, propertyId);
       const description = `${property.name}: casa occupata dal ${startDate} al ${endDate}${note ? `. ${note}` : ''}`;
       if (adminMode) {
         await notifyCustomer(client, property.customer_id, 'occupancy', 'Periodo di occupazione registrato', description, 'properties', `occupancy-created:${occupancy.id}`);
@@ -162,7 +172,7 @@ function installOperationalFeatures(dependencies) {
         [occupancyId, startDate, endDate, note],
         client
       )).rows[0];
-      await adjustNextCheck(client, current.property_id);
+      await recalculateNextCheck(client, current.property_id);
       const description = `${current.property_name}: periodo aggiornato dal ${startDate} al ${endDate}${note ? `. ${note}` : ''}`;
       if (adminMode) {
         await notifyCustomer(client, current.customer_id, 'occupancy', 'Periodo di occupazione aggiornato', description, 'properties', `occupancy-updated:${occupancy.id}:${occupancy.updated_at}`);
@@ -245,6 +255,7 @@ function installOperationalFeatures(dependencies) {
         [reportId, notes, JSON.stringify(checklist), completedAt],
         client
       )).rows[0];
+      await recalculateNextCheck(client, current.property_id);
       await notifyCustomer(client, current.customer_id, 'report', 'Report aggiornato', `Il report di ${current.property_name} è stato aggiornato da Home Care.`, 'reports', `report-updated:${reportId}:${updated.updated_at}`);
       return updated;
     });
@@ -302,7 +313,7 @@ function installOperationalFeatures(dependencies) {
       if (!current) throw new HttpError(404, 'Report non trovato', 'NOT_FOUND');
       await q('DELETE FROM checks WHERE id=$1', [reportId], client);
       const scheduling = (await q(
-        `SELECT ps.days,MAX(ch.completed_at::date) last_completed
+        `SELECT ps.days,MAX(ch.completed_at::date)::text last_completed
            FROM properties p JOIN plan_settings ps ON ps.id=p.package_type
            LEFT JOIN checks ch ON ch.property_id=p.id AND ch.status='done'
           WHERE p.id=$1 GROUP BY ps.days`,
@@ -393,7 +404,8 @@ function installOperationalFeatures(dependencies) {
       const row = (await q(
         `SELECT n.*,u.email,u.name,u.email_notifications
            FROM notifications n JOIN users u ON u.id=n.user_id
-          WHERE n.email_status='pending' AND n.email_attempts<3
+          WHERE (n.email_status='pending' OR (n.email_status='sending' AND n.created_at<NOW()-INTERVAL '10 minutes'))
+            AND n.email_attempts<3
           ORDER BY n.created_at ASC
           FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
         [],
@@ -429,7 +441,7 @@ function installOperationalFeatures(dependencies) {
         );
         await q(
           `UPDATE notifications SET email_status=$2,email_sent_at=CASE WHEN $2='sent' THEN NOW() ELSE email_sent_at END,email_error=$3 WHERE id=$1`,
-          [notification.id, result?.sent ? 'sent' : 'pending', result?.sent ? null : String(result?.reason || 'Invio non completato')]
+          [notification.id, result?.sent ? 'sent' : (notification.email_attempts >= 3 ? 'failed' : 'pending'), result?.sent ? null : String(result?.reason || 'Invio non completato').slice(0, 1000)]
         );
       } catch (error) {
         const finalFailure = notification.email_attempts >= 3;

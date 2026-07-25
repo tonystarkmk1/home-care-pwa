@@ -15,6 +15,12 @@
     }[character]));
   }
 
+  function cssEscape(value) {
+    const text = String(value || '');
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(text);
+    return text.replace(/[^a-zA-Z0-9_-]/g, '');
+  }
+
   function dateIT(value) {
     if (!value) return '—';
     const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -83,7 +89,7 @@
 
   function refreshCurrentTab() {
     const tab = currentTab();
-    const button = document.querySelector(`[data-action="set-tab"][data-tab="${CSS.escape(tab)}"]`);
+    const button = document.querySelector(`[data-action="set-tab"][data-tab="${cssEscape(tab)}"]`);
     if (button) button.click();
     else window.location.reload();
   }
@@ -285,7 +291,7 @@
       await request(`/api/notifications/${encodeURIComponent(button.dataset.id)}/read`, { method: 'PATCH', body: {} });
       closeNotifications();
       const tab = button.dataset.tab;
-      if (tab) document.querySelector(`[data-action="set-tab"][data-tab="${CSS.escape(tab)}"]`)?.click();
+      if (tab) document.querySelector(`[data-action="set-tab"][data-tab="${cssEscape(tab)}"]`)?.click();
       return renderNotifications(false);
     }
     if (action === 'test-notification-email') {
@@ -349,6 +355,11 @@
       }
       if (kind === 'edit-report') {
         const data = formDataObject(form);
+        if (data.completed_at) {
+          const completed = new Date(data.completed_at);
+          if (Number.isNaN(completed.getTime())) throw new Error('Data e ora del report non valide.');
+          data.completed_at = completed.toISOString();
+        }
         data.checklist_json = String(data.checklist_text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
         delete data.checklist_text;
         await request(`/api/admin/reports/${encodeURIComponent(form.dataset.id)}`, { method: 'PATCH', body: data });

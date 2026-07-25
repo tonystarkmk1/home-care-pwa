@@ -11,6 +11,12 @@ const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://homecare:homecare
 const JWT_SECRET = 'home-care-test-secret-with-more-than-32-characters';
 const stripeSessions = [];
 
+function datePlus(days) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 const fakeStripe = {
   webhooks: {
     constructEvent(body, signature) {
@@ -246,4 +252,109 @@ test('il webhook Stripe senza firma viene respinto', async () => {
     body: JSON.stringify({ id: 'evt_unsigned', type: 'checkout.session.completed', data: { object: {} } }),
   });
   assert.equal(result.status, 400);
+});
+
+test('occupazioni, notifiche e gestione completa di report e immobili funzionano', async () => {
+  const payment = await admin.request(`/api/admin/customers/${ownerCustomerId}/manual-payment`, {
+    method: 'POST',
+    json: { amount_euro: '39.00', paid_until: '2099-12-31', method: 'bonifico', description: 'Test operazioni', package_type: 'base' },
+  });
+  assert.equal(payment.response.status, 200, JSON.stringify(payment.data));
+
+  const propertyRequest = await owner.request('/api/client/properties', {
+    method: 'POST',
+    json: { name: 'Casa Operazioni V2', address: 'Via Operazioni 41', city: 'Badesi', package_type: 'base' },
+  });
+  assert.equal(propertyRequest.response.status, 201, JSON.stringify(propertyRequest.data));
+  const propertyId = propertyRequest.data.property.id;
+  const approval = await admin.request(`/api/admin/properties/${propertyId}/approve`, {
+    method: 'POST',
+    json: { package_type: 'base', monthly_price_euro: '39.00' },
+  });
+  assert.equal(approval.response.status, 200, JSON.stringify(approval.data));
+
+  const occupancy = await owner.request('/api/client/occupancies', {
+    method: 'POST',
+    json: { property_id: propertyId, start_date: datePlus(0), end_date: datePlus(1), note: 'Casa occupata per test' },
+  });
+  assert.equal(occupancy.response.status, 201, JSON.stringify(occupancy.data));
+  const occupancyId = occupancy.data.occupancy.id;
+
+  const dueChecks = await admin.request('/api/admin/due-checks');
+  assert.equal(dueChecks.response.status, 200);
+  assert.equal(dueChecks.data.checks.some((item) => item.id === propertyId), false);
+
+  const blockedForm = new FormData();
+  blockedForm.append('property_id', propertyId);
+  blockedForm.append('notes', 'Non deve essere eseguito');
+  blockedForm.append('checklist_json', '[]');
+  const blocked = await admin.request('/api/admin/checks/complete', { method: 'POST', body: blockedForm });
+  assert.equal(blocked.response.status, 409, JSON.stringify(blocked.data));
+  assert.equal(blocked.data.code, 'PROPERTY_OCCUPIED');
+
+  const adminNotifications = await admin.request('/api/notifications');
+  assert.equal(adminNotifications.response.status, 200);
+  assert.ok(adminNotifications.data.notifications.some((item) => item.kind === 'occupancy'));
+
+  const editedOccupancy = await owner.request(`/api/client/occupancies/${occupancyId}`, {
+    method: 'PATCH',
+    json: { start_date: datePlus(0), end_date: datePlus(2), note: 'Periodo aggiornato' },
+  });
+  assert.equal(editedOccupancy.response.status, 200, JSON.stringify(editedOccupancy.data));
+  const deletedOccupancy = await owner.request(`/api/client/occupancies/${occupancyId}`, { method: 'DELETE', json: {} });
+  assert.equal(deletedOccupancy.response.status, 200, JSON.stringify(deletedOccupancy.data));
+
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+X7W6WQAAAABJRU5ErkJggg==', 'base64');
+  const completeForm = new FormData();
+  completeForm.append('property_id', propertyId);
+  completeForm.append('notes', 'Report originale');
+  completeForm.append('checklist_json', JSON.stringify(['Porta controllata']));
+  completeForm.append('photos', new Blob([png], { type: 'image/png' }), 'report.png');
+  const completed = await admin.request('/api/admin/checks/complete', { method: 'POST', body: completeForm });
+  assert.equal(completed.response.status, 201, JSON.stringify(completed.data));
+  const reportId = completed.data.check.id;
+
+  const reportUpdate = await admin.request(`/api/admin/reports/${reportId}`, {
+    method: 'PATCH',
+    json: { notes: 'Report modificato', checklist_json: ['Porta controllata', 'Finestre controllate'], completed_at: new Date(Date.now() - 60_000).toISOString() },
+  });
+  assert.equal(reportUpdate.response.status, 200, JSON.stringify(reportUpdate.data));
+
+  const addPhotos = new FormData();
+  addPhotos.append('photos', new Blob([png], { type: 'image/png' }), 'aggiunta.png');
+  const photoUpload = await admin.request(`/api/admin/reports/${reportId}/photos`, { method: 'POST', body: addPhotos });
+  assert.equal(photoUpload.response.status, 201, JSON.stringify(photoUpload.data));
+
+  const dashboard = await owner.request('/api/client/dashboard');
+  const editedReport = dashboard.data.reports.find((item) => item.id === reportId);
+  assert.equal(editedReport.notes, 'Report modificato');
+  assert.deepEqual(editedReport.checklist_json, ['Porta controllata', 'Finestre controllate']);
+  assert.ok(editedReport.photos.length >= 2);
+
+  const photoDelete = await admin.request(`/api/admin/photos/${editedReport.photos[0].id}`, { method: 'DELETE', json: {} });
+  assert.equal(photoDelete.response.status, 200, JSON.stringify(photoDelete.data));
+  const reportDelete = await admin.request(`/api/admin/reports/${reportId}`, { method: 'DELETE', json: {} });
+  assert.equal(reportDelete.response.status, 200, JSON.stringify(reportDelete.data));
+
+  const wrongDelete = await admin.request(`/api/admin/properties/${propertyId}`, {
+    method: 'DELETE',
+    json: { confirm_name: 'Nome errato', confirmation: 'ELIMINA' },
+  });
+  assert.equal(wrongDelete.response.status, 400);
+  const propertyDelete = await admin.request(`/api/admin/properties/${propertyId}`, {
+    method: 'DELETE',
+    json: { confirm_name: 'Casa Operazioni V2', confirmation: 'ELIMINA' },
+  });
+  assert.equal(propertyDelete.response.status, 200, JSON.stringify(propertyDelete.data));
+
+  const ownerNotifications = await owner.request('/api/notifications');
+  assert.equal(ownerNotifications.response.status, 200);
+  assert.ok(ownerNotifications.data.notifications.some((item) => item.kind === 'report'));
+  const firstNotification = ownerNotifications.data.notifications[0];
+  const readNotification = await owner.request(`/api/notifications/${firstNotification.id}/read`, { method: 'PATCH', json: {} });
+  assert.equal(readNotification.response.status, 200);
+
+  const emailTest = await admin.request('/api/admin/notifications/test-email', { method: 'POST', json: {} });
+  assert.equal(emailTest.response.status, 503);
+  assert.equal(emailTest.data.code, 'EMAIL_DISABLED');
 });

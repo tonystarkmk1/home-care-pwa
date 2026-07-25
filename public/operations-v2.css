@@ -149,7 +149,8 @@
   font-weight: 850;
 }
 .hc-report-editor[open] summary { margin-bottom: 12px; }
-.hc-photo-wrap { position: relative; }
+.hc-photo-wrap { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 13px; }
+.hc-photo-wrap .photo-link { width: 100%; height: 100%; display: block; }
 .hc-photo-delete {
   position: absolute;
   z-index: 2;
