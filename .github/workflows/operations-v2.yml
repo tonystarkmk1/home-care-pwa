@@ -66,20 +66,38 @@ jobs:
           set -euo pipefail
           node scripts/run-operations-v2-patch.js 2>&1 | tee operations-patch.log
 
-      - name: Salva log integrazione
+      - name: Prepara copia sorgente verificabile
+        shell: bash
+        run: tar --exclude=.git --exclude=node_modules --exclude=operations-source.tgz -czf operations-source.tgz .
+
+      - name: Salva sorgente e log integrazione
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: operations-patch-${{ github.run_id }}
-          path: operations-patch.log
-          if-no-files-found: warn
+          name: operations-source-${{ github.run_id }}
+          path: |
+            operations-source.tgz
+            operations-patch.log
+          if-no-files-found: error
           retention-days: 2
 
       - name: Installa dipendenze e aggiorna lockfile
         run: npm install --ignore-scripts --no-fund
 
       - name: Controlli sintattici, statici e PWA
-        run: npm run check
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check 2>&1 | tee operations-check.log
+
+      - name: Salva log controlli
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-check-${{ github.run_id }}
+          path: operations-check.log
+          if-no-files-found: warn
+          retention-days: 2
 
       - name: Migrazioni e seed idempotenti
         run: |
@@ -100,7 +118,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -f operations-patch.log
+          rm -f operations-patch.log operations-check.log operations-source.tgz
           git add -A
           if git diff --cached --quiet; then
             echo "Nessuna modifica da registrare"
