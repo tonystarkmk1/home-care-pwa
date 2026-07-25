@@ -1,20 +1,22 @@
 'use strict';
 
-const SW_VERSION = 'home-care-v41';
+const SW_VERSION = 'home-care-v42';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const STATIC_ASSETS = [
   '/offline.html',
   '/app.css',
   '/app.js',
   '/operations-v2.css',
+  '/guided-checks-v2.css',
   '/operations-v2.js',
+  '/guided-checks-v2.js',
   '/pwa-v2.js',
-  '/manifest.json?v=41',
-  '/icon.svg?v=41',
-  '/icon-192.png?v=41',
-  '/icon-512.png?v=41',
-  '/apple-touch-icon.png?v=41',
-  '/favicon.ico?v=41',
+  '/manifest.json?v=42',
+  '/icon.svg?v=42',
+  '/icon-192.png?v=42',
+  '/icon-512.png?v=42',
+  '/apple-touch-icon.png?v=42',
+  '/favicon.ico?v=42',
 ];
 
 function isSensitive(url) {
