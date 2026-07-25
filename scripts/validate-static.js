@@ -8,7 +8,10 @@ const root = path.join(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const required = [
   'server3.js', 'schema.sql', 'public/index.html', 'public/app.css', 'public/app.js',
-  'public/pwa-v2.js', 'public/operations-v2.js', 'public/operations-v2.css', 'public/guided-checks-v2.js', 'public/guided-checks-v2.css', 'public/sw.js', 'public/manifest.json', 'public/offline.html',
+  'public/runtime-stability-v43.js', 'public/pwa-v43.js', 'public/operations-v2.js',
+  'public/operations-v2.css', 'public/guided-checks-v2.js', 'public/guided-checks-v2.css',
+  'public/sw.js', 'public/manifest.json', 'public/offline.html', 'public/icon.svg',
+  'public/icon-192.png', 'public/icon-512.png', 'public/apple-touch-icon.png', 'public/favicon.ico',
   'src/guided-checks-v2.js', 'tests/guided-checks.test.js',
   'scripts/migrate.js', 'scripts/seed.js', 'scripts/start-stable.js',
 ];
@@ -16,7 +19,8 @@ required.forEach((file) => assert.ok(fs.existsSync(path.join(root, file)), `${fi
 
 const index = read('public/index.html');
 const app = read('public/app.js');
-const installer = read('public/pwa-v2.js');
+const runtime = read('public/runtime-stability-v43.js');
+const installer = read('public/pwa-v43.js');
 const operations = read('public/operations-v2.js');
 const operationsCss = read('public/operations-v2.css');
 const guided = read('public/guided-checks-v2.js');
@@ -34,21 +38,30 @@ assert.doesNotMatch(index, /\sstyle\s*=/i, 'index.html contiene stile inline');
 assert.doesNotMatch(index, /javascript:/i, 'index.html contiene URL javascript');
 assert.match(index, /viewport-fit=cover/);
 assert.match(index, /data-apply-update/);
-assert.match(index, /pwa-v2\.js/);
-assert.match(index, /operations-v2\.js/);
-assert.match(index, /operations-v2\.css/);
-assert.match(index, /guided-checks-v2\.js/);
-assert.match(index, /guided-checks-v2\.css/);
+assert.match(index, /runtime-stability-v43\.js\?v=43/);
+assert.match(index, /pwa-v43\.js\?v=43/);
+assert.match(index, /operations-v2\.js\?v=43/);
+assert.match(index, /guided-checks-v2\.js\?v=43/);
 
 assert.doesNotMatch(app, /localStorage\.setItem\([^)]*(token|session)/i, 'il token non deve essere salvato in localStorage');
 assert.doesNotMatch(app, /\sonclick=/i, 'app.js non deve generare onclick inline');
 assert.doesNotMatch(app, /\sstyle=/i, 'app.js non deve generare style inline');
 assert.match(app, /data-install-app/);
 assert.match(app, /esc\(/);
+
+assert.match(runtime, /StableMutationObserver/);
+assert.match(runtime, /recoverBoot/);
+assert.match(runtime, /serviceWorker\.getRegistrations/);
 assert.match(installer, /beforeinstallprompt/);
 assert.match(installer, /iphone\|ipad\|ipod/i);
 assert.match(installer, /samsungbrowser/i);
-assert.match(installer, /controllerchange/);
+assert.match(installer, /reloadForUpdate/);
+assert.match(installer, /installLabelState/);
+assert.doesNotMatch(installer, /controllerchange[\s\S]{0,200}window\.location\.reload\(\)(?![\s\S]*reloadForUpdate)/);
+
+assert.match(worker, /home-care-v43/);
+assert.match(worker, /networkFirst/);
+assert.match(worker, /content-type/);
 assert.match(worker, /\/api\//);
 assert.match(worker, /cache:\s*'no-store'/);
 assert.match(operations, /data-hc-action/);
@@ -63,7 +76,18 @@ assert.match(schema, /home_care_next_available_date/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS guided_checks/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS property_check_templates/);
 
+for (const file of ['public/icon-192.png', 'public/icon-512.png', 'public/apple-touch-icon.png']) {
+  const buffer = fs.readFileSync(path.join(root, file));
+  assert.ok(buffer.length > 500, `${file} troppo piccolo`);
+  assert.equal(buffer.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', `${file} non è un PNG valido`);
+}
+const favicon = fs.readFileSync(path.join(root, 'public/favicon.ico'));
+assert.ok(favicon.length > 500, 'favicon.ico troppo piccolo');
+assert.equal(favicon.subarray(0, 4).toString('hex'), '00000100', 'favicon.ico non valido');
+
 assert.equal(packageJson.dependencies.multer, '2.2.0');
+assert.match(packageJson.scripts.check, /runtime-stability-v43/);
+assert.match(packageJson.scripts.check, /pwa-v43/);
 assert.match(packageJson.scripts.check, /validate:static/);
 assert.match(packageJson.scripts.test, /node --test/);
 assert.equal(packageJson.engines.node, '22.23.1');
@@ -81,8 +105,9 @@ assert.equal(manifest.id, '/');
 assert.equal(manifest.display, 'standalone');
 assert.deepEqual(manifest.display_override, ['standalone']);
 assert.equal(manifest.scope, '/');
-assert.ok(manifest.icons.some((icon) => icon.sizes === '192x192'));
-assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512'));
+assert.match(manifest.start_url, /app_version=43/);
+assert.ok(manifest.icons.some((icon) => icon.sizes === '192x192' && icon.type === 'image/png'));
+assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512' && icon.type === 'image/png'));
 assert.ok(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 2);
 
 console.log('Validazione statica completata.');
