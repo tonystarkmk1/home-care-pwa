@@ -68,7 +68,7 @@ jobs:
 
       - name: Prepara copia sorgente verificabile
         shell: bash
-        run: tar --exclude=.git --exclude=node_modules --exclude=operations-source.tgz -czf operations-source.tgz .
+        run: tar --exclude=.git --exclude=node_modules -czf /tmp/operations-source.tgz .
 
       - name: Salva sorgente e log integrazione
         if: always()
@@ -76,7 +76,7 @@ jobs:
         with:
           name: operations-source-${{ github.run_id }}
           path: |
-            operations-source.tgz
+            /tmp/operations-source.tgz
             operations-patch.log
           if-no-files-found: error
           retention-days: 2
