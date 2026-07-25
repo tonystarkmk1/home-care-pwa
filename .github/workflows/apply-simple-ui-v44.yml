@@ -1,0 +1,102 @@
+name: Applica Home Care Simple UI V44
+
+on:
+  push:
+    branches:
+      - agent/home-care-simple-ux-v44
+    paths:
+      - 'src/simple-ux-v44.js'
+      - 'public/simple-ui-v44.js'
+      - 'public/simple-ui-v44.css'
+      - 'tests/simple-ui-v44.test.js'
+      - 'scripts/apply-simple-ui-v44.js'
+      - '.github/workflows/apply-simple-ui-v44.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: home-care-simple-ui-v44
+  cancel-in-progress: false
+
+jobs:
+  apply-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: homecare
+          POSTGRES_PASSWORD: homecare_test
+          POSTGRES_DB: homecare_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U homecare -d homecare_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      PORT: 31337
+      APP_URL: http://127.0.0.1:31337
+      DATABASE_URL: postgresql://homecare:homecare_test@127.0.0.1:5432/homecare_test
+      JWT_SECRET: home-care-simple-ui-v44-workflow-secret-with-more-than-thirty-two-characters
+      ADMIN_NAME: Admin Simple UI Test
+      ADMIN_EMAIL: admin-simple-ui@example.test
+      ADMIN_PASSWORD: Admin-password-Simple-UI-2026!
+      RESET_ADMIN_PASSWORD: 'false'
+      STRIPE_WEBHOOK_SECRET: whsec_simple_ui_v44_test
+      REGISTRATION_ENABLED: 'true'
+    steps:
+      - name: Scarica il branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/home-care-simple-ux-v44
+          fetch-depth: 0
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+          cache: npm
+
+      - name: Applica la nuova organizzazione dell'interfaccia
+        run: node scripts/apply-simple-ui-v44.js
+
+      - name: Aggiorna lockfile e installa le dipendenze
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-fund --no-audit
+
+      - name: Controlli statici, sintattici e PWA
+        run: npm run check
+
+      - name: Verifica migrazioni e seed idempotenti
+        run: |
+          npm run migrate
+          npm run migrate
+          npm run seed
+          npm run seed
+
+      - name: Test di integrazione e sicurezza
+        run: npm test
+
+      - name: Audit dipendenze di produzione
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Registra la versione verificata
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f scripts/apply-simple-ui-v44.js
+          rm -f .github/workflows/apply-simple-ui-v44.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --stat
+          git diff --cached --quiet && { echo 'Nessuna modifica da registrare'; exit 1; }
+          git commit -m 'Semplifica area cliente e admin con onboarding piano-first'
+          git push origin HEAD:agent/home-care-simple-ux-v44
