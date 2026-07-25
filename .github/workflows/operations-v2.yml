@@ -92,7 +92,6 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Registra i file verificati sul branch
-        if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
