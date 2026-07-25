@@ -34,7 +34,7 @@ function repairOperationsFrontend() {
     '  function cssEscape(value) {',
     "    const text = String(value || '');",
     "    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(text);",
-    "    return text.replace(/\\\\/g, '\\\\\\\\').replace(/\"/g, '\\\\"');",
+    "    return text.replace(/[^a-zA-Z0-9_-]/g, '');",
     '  }',
   ].join('\n');
   content = `${content.slice(0, blockStart)}${replacement}${content.slice(blockEnd)}`;
