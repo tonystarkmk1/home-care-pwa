@@ -1,0 +1,137 @@
+name: Apply infinite boot fix v42
+
+on:
+  push:
+    branches: [fix/infinite-boot-pwa-v42]
+    paths:
+      - .github/workflows/apply-infinite-boot-fix-v42.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-infinite-boot-fix-v42
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/infinite-boot-pwa-v42
+          fetch-depth: 0
+
+      - name: Apply runtime and PWA fixes
+        shell: bash
+        run: |
+          node <<'NODE'
+          'use strict';
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const zlib = require('node:zlib');
+          const read = (file) => fs.readFileSync(file, 'utf8');
+          const write = (file, content) => fs.writeFileSync(file, content);
+          function replaceOnce(source, before, after, label) {
+            const index = source.indexOf(before);
+            if (index < 0) throw new Error(`Pattern non trovato: ${label}`);
+            if (source.indexOf(before, index + before.length) >= 0) throw new Error(`Pattern duplicato: ${label}`);
+            return source.slice(0, index) + after + source.slice(index + before.length);
+          }
+
+          let app = read('public/app.js');
+          app = replaceOnce(app, "    const response = await fetch(url, { ...options, method, headers, body, credentials: 'same-origin', cache: 'no-store' });", "    const controller = new AbortController();\n    const timeout = window.setTimeout(() => controller.abort(), Number(options.timeoutMs || 15_000));\n    let response;\n    try {\n      response = await fetch(url, { ...options, method, headers, body, credentials: 'same-origin', cache: 'no-store', signal: options.signal || controller.signal });\n    } catch (error) {\n      if (error?.name === 'AbortError') {\n        const timeoutError = new Error('Il server sta impiegando troppo tempo. Riprova.');\n        timeoutError.code = 'REQUEST_TIMEOUT';\n        throw timeoutError;\n      }\n      throw error;\n    } finally {\n      window.clearTimeout(timeout);\n    }", 'timeout API');
+          app = replaceOnce(app, "      } else {\n        await loadAdminBase();\n        const routes = {\n          dashboard: adminDashboard, requests: adminRequests, customers: adminCustomers, properties: adminProperties,\n          checks: adminChecks, reports: adminReports, tasks: adminTasks, route: adminRoute, payments: adminPayments,\n          messages: adminMessages, contacts: adminContacts, custom_plans: adminCustomPlans,\n          plan_settings: adminPlanSettings, helpers: adminHelpers,\n        };\n        await (routes[state.tab] || adminDashboard)();\n      }", "      } else {\n        const routes = {\n          dashboard: adminDashboard, requests: adminRequests, customers: adminCustomers, properties: adminProperties,\n          checks: adminChecks, reports: adminReports, tasks: adminTasks, route: adminRoute, payments: adminPayments,\n          messages: adminMessages, contacts: adminContacts, custom_plans: adminCustomPlans,\n          plan_settings: adminPlanSettings, helpers: adminHelpers,\n        };\n        const route = routes[state.tab] || adminDashboard;\n        const tabsNeedingBase = new Set(['customers', 'properties', 'tasks', 'payments', 'custom_plans']);\n        if (tabsNeedingBase.has(state.tab)) await loadAdminBase();\n        await route();\n      }", 'caricamento admin iniziale');
+          app = replaceOnce(app, "  async function boot() {\n    try {", "  async function boot() {\n    const bootDone = () => {\n      window.__HOME_CARE_BOOT_READY__ = true;\n      if (typeof window.__HOME_CARE_BOOT_OK__ === 'function') window.__HOME_CARE_BOOT_OK__();\n    };\n    try {", 'inizio boot');
+          app = replaceOnce(app, "      if (resetCode) return renderResetPassword(resetCode);", "      if (resetCode) {\n        renderResetPassword(resetCode);\n        bootDone();\n        return;\n      }", 'boot reset');
+          app = replaceOnce(app, "      if (!state.user) return renderPublicHome();", "      if (!state.user) {\n        renderPublicHome();\n        bootDone();\n        return;\n      }", 'boot pubblico');
+          app = replaceOnce(app, "      renderShell();\n    } catch (error) {", "      renderShell();\n      bootDone();\n    } catch (error) {", 'boot shell');
+          app = replaceOnce(app, "      app.innerHTML = `<main class=\"confirmation-page\"><section class=\"confirmation-card\"><div class=\"brand-lockup\"><span class=\"brand-mark\">HC</span><span>Home Care</span></div><h1>Servizio non disponibile</h1><p>${esc(error.message || 'Impossibile collegarsi al server.')}</p><button class=\"button primary\" type=\"button\" data-action=\"reload-app\">Riprova</button></section></main>`;\n    }\n  }", "      app.innerHTML = `<main class=\"confirmation-page\"><section class=\"confirmation-card\"><div class=\"brand-lockup\"><span class=\"brand-mark\">HC</span><span>Home Care</span></div><h1>Servizio non disponibile</h1><p>${esc(error.message || 'Impossibile collegarsi al server.')}</p><button class=\"button primary\" type=\"button\" data-action=\"reload-app\">Riprova</button></section></main>`;\n      bootDone();\n    }\n  }", 'boot errore');
+          write('public/app.js', app);
+
+          let pwa = read('public/pwa-v2.js').replaceAll('home-care-v41', 'home-care-v42').replaceAll("pwa_reset', '41", "pwa_reset', '42");
+          pwa = replaceOnce(pwa, "  function setButtonLabel(button, nativePrompt) {\n    if (!button) return;\n    const desktopCopy = button.querySelector('.desktop-copy');\n    const label = nativePrompt ? 'Installa app' : 'Come installare';\n    if (desktopCopy) desktopCopy.textContent = nativePrompt ? 'Installa' : 'Installazione';\n    else button.innerHTML = `<span aria-hidden=\"true\">⇩</span> ${label}`;\n    button.dataset.installReady = nativePrompt ? '1' : '0';\n  }", "  function setButtonLabel(button, nativePrompt) {\n    if (!button) return;\n    const mode = nativePrompt ? 'native' : 'guide';\n    if (button.dataset.installLabel === mode) return;\n    const desktopCopy = button.querySelector('.desktop-copy');\n    const label = nativePrompt ? 'Installa app' : 'Come installare';\n    if (desktopCopy) desktopCopy.textContent = nativePrompt ? 'Installa' : 'Installazione';\n    else button.innerHTML = `<span aria-hidden=\"true\">⇩</span> ${label}`;\n    button.dataset.installReady = nativePrompt ? '1' : '0';\n    button.dataset.installLabel = mode;\n  }", 'loop pulsante installazione');
+          pwa = replaceOnce(pwa, "    navigator.serviceWorker.addEventListener('controllerchange', () => {\n      if (reloading) return;\n      reloading = true;\n      window.location.reload();\n    });", "    navigator.serviceWorker.addEventListener('controllerchange', () => {\n      if (reloading) return;\n      const reloadKey = `hc-controller-reload-${APP_VERSION}`;\n      try {\n        if (sessionStorage.getItem(reloadKey) === '1') return;\n        sessionStorage.setItem(reloadKey, '1');\n      } catch (_) {}\n      reloading = true;\n      window.location.reload();\n    });", 'reload service worker');
+          write('public/pwa-v2.js', pwa);
+
+          let operations = read('public/operations-v2.js');
+          operations = replaceOnce(operations, "    const count = document.querySelector('.hc-notification-count');\n    if (count) {\n      count.textContent = response.unread > 99 ? '99+' : String(response.unread || 0);\n      count.hidden = !response.unread;\n    }", "    const count = document.querySelector('.hc-notification-count');\n    if (count) {\n      const nextCount = response.unread > 99 ? '99+' : String(response.unread || 0);\n      if (count.textContent !== nextCount) count.textContent = nextCount;\n      count.hidden = !response.unread;\n    }", 'loop notifiche');
+          write('public/operations-v2.js', operations);
+
+          let index = read('public/index.html').replaceAll('v=41', 'v=42');
+          index = replaceOnce(index, '<link rel="shortcut icon" href="/favicon.ico?v=42">', '<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=42">', 'favicon');
+          index = replaceOnce(index, '  <script src="/app.js?v=42" defer></script>', '  <script src="/boot-guard.js?v=42" defer></script>\n  <script src="/app.js?v=42" defer></script>', 'boot guard');
+          write('public/index.html', index);
+
+          write('public/sw.js', `'use strict';
+const SW_VERSION = 'home-care-v42';
+const STATIC_CACHE = \`${'${SW_VERSION}'}-static\`;
+const OFFLINE_URL = '/offline.html';
+const STATIC_ASSETS = [OFFLINE_URL,'/app.css?v=42','/app.js?v=42','/operations-v2.css?v=42','/operations-v2.js?v=42','/pwa-v2.js?v=42','/boot-guard.js?v=42','/manifest.json?v=42','/icon.svg?v=42','/icon-192.png?v=42','/icon-512.png?v=42','/apple-touch-icon.png?v=42','/favicon.png?v=42'];
+function isSensitive(url){return url.pathname.startsWith('/api/')||url.pathname.startsWith('/uploads/');}
+function isStatic(url){return /\\.(?:css|js|png|jpg|jpeg|webp|svg|ico|json|woff2?)$/i.test(url.pathname)||url.pathname===OFFLINE_URL||url.pathname==='/manifest.json';}
+async function cacheResponse(request,response){if(!response||!response.ok||response.type!=='basic')return response;const cache=await caches.open(STATIC_CACHE);await cache.put(request,response.clone());return response;}
+async function networkFirst(request,fallback){try{return await cacheResponse(request,await fetch(request,{cache:'no-store'}));}catch(_){return(await caches.match(request))||(fallback?await caches.match(fallback):Response.error());}}
+self.addEventListener('install',(event)=>event.waitUntil(caches.open(STATIC_CACHE).then((cache)=>cache.addAll(STATIC_ASSETS)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',(event)=>event.waitUntil(caches.keys().then((keys)=>Promise.all(keys.filter((key)=>key.startsWith('home-care-')&&key!==STATIC_CACHE).map((key)=>caches.delete(key)))).then(()=>self.clients.claim())));
+self.addEventListener('message',(event)=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});
+self.addEventListener('fetch',(event)=>{const request=event.request;if(request.method!=='GET')return;const url=new URL(request.url);if(url.origin!==self.location.origin||url.pathname==='/sw.js'||isSensitive(url))return;if(request.mode==='navigate'){event.respondWith(networkFirst(request,OFFLINE_URL));return;}if(isStatic(url))event.respondWith(networkFirst(request));});
+`);
+
+          const manifest = JSON.parse(read('public/manifest.json').replaceAll('v=41', 'v=42'));
+          manifest.start_url = '/?source=pwa&v=42';
+          write('public/manifest.json', `${JSON.stringify(manifest, null, 2)}\n`);
+          const packageJson = JSON.parse(read('package.json'));
+          packageJson.version = '1.1.1';
+          packageJson.scripts.check = packageJson.scripts.check.replace('node --check public/app.js', 'node --check public/boot-guard.js && node --check public/app.js');
+          write('package.json', `${JSON.stringify(packageJson, null, 2)}\n`);
+          const lock = JSON.parse(read('package-lock.json'));
+          lock.version = '1.1.1';
+          if (lock.packages?.['']) lock.packages[''].version = '1.1.1';
+          write('package-lock.json', `${JSON.stringify(lock, null, 2)}\n`);
+
+          let validator = read('scripts/validate-static.js');
+          validator = replaceOnce(validator, "'public/pwa-v2.js', 'public/operations-v2.js'", "'public/boot-guard.js', 'public/pwa-v2.js', 'public/operations-v2.js'", 'validator files');
+          validator = replaceOnce(validator, "const app = read('public/app.js');", "const app = read('public/app.js');\nconst bootGuard = read('public/boot-guard.js');", 'validator guard read');
+          validator = replaceOnce(validator, 'assert.match(index, /pwa-v2\\.js/);', 'assert.match(index, /boot-guard\\.js/);\nassert.match(index, /pwa-v2\\.js/);', 'validator index');
+          validator = replaceOnce(validator, 'assert.match(installer, /beforeinstallprompt/);', 'assert.match(bootGuard, /unhandledrejection/);\nassert.match(bootGuard, /getRegistrations/);\nassert.match(installer, /beforeinstallprompt/);', 'validator boot');
+          validator = replaceOnce(validator, 'assert.match(installer, /controllerchange/);', 'assert.match(installer, /controllerchange/);\nassert.match(installer, /installLabel/);\nassert.match(operations, /nextCount/);', 'validator loops');
+          validator = replaceOnce(validator, "assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512'));", "assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512'));\nassert.ok(fs.statSync(path.join(root, 'public/icon-192.png')).size > 500);\nassert.ok(fs.statSync(path.join(root, 'public/icon-512.png')).size > 1000);", 'validator icons');
+          write('scripts/validate-static.js', validator);
+
+          function crc32(buffer){let crc=0xffffffff;for(const byte of buffer){crc^=byte;for(let bit=0;bit<8;bit+=1)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return(crc^0xffffffff)>>>0;}
+          function chunk(type,data){const name=Buffer.from(type);const len=Buffer.alloc(4);len.writeUInt32BE(data.length);const sum=Buffer.alloc(4);sum.writeUInt32BE(crc32(Buffer.concat([name,data])));return Buffer.concat([len,name,data,sum]);}
+          function icon(size){const px=Buffer.alloc(size*size*4);const set=(x,y,c)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=size||y>=size)return;const i=(y*size+x)*4;for(let k=0;k<4;k+=1)px[i+k]=c[k];};const rect=(x0,y0,x1,y1,c)=>{for(let y=Math.max(0,Math.floor(y0));y<Math.min(size,Math.ceil(y1));y++)for(let x=Math.max(0,Math.floor(x0));x<Math.min(size,Math.ceil(x1));x++)set(x,y,c);};const circle=(cx,cy,r,c)=>{for(let y=cy-r;y<=cy+r;y++)for(let x=cx-r;x<=cx+r;x++)if((x-cx)**2+(y-cy)**2<=r*r)set(x,y,c);};const line=(x0,y0,x1,y1,w,c)=>{const n=Math.max(Math.abs(x1-x0),Math.abs(y1-y0),1);for(let i=0;i<=n;i++)circle(Math.round(x0+(x1-x0)*i/n),Math.round(y0+(y1-y0)*i/n),Math.max(1,Math.round(w/2)),c);};const navy=[8,42,62,255],navy2=[11,61,88,255],gold=[211,165,58,255],white=[255,254,251,255],teal=[14,143,141,255];rect(0,0,size,size,navy);circle(size/2,size/2,size*.43,navy2);line(size*.22,size*.47,size*.5,size*.25,size*.055,gold);line(size*.5,size*.25,size*.78,size*.47,size*.055,gold);rect(size*.29,size*.43,size*.71,size*.75,white);rect(size*.45,size*.59,size*.55,size*.75,gold);rect(size*.35,size*.51,size*.42,size*.58,teal);rect(size*.58,size*.51,size*.65,size*.58,teal);const raw=Buffer.alloc((size*4+1)*size);for(let y=0;y<size;y++){const o=y*(size*4+1);raw[o]=0;px.copy(raw,o+1,y*size*4,(y+1)*size*4);}const h=Buffer.alloc(13);h.writeUInt32BE(size,0);h.writeUInt32BE(size,4);h[8]=8;h[9]=6;return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',h),chunk('IDAT',zlib.deflateSync(raw,{level:9})),chunk('IEND',Buffer.alloc(0))]);}
+          write('public/icon-192.png', icon(192));
+          write('public/icon-512.png', icon(512));
+          write('public/apple-touch-icon.png', icon(180));
+          write('public/favicon.png', icon(64));
+          console.log('Hotfix v42 applicato.');
+          NODE
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+          cache: npm
+
+      - name: Install and validate
+        run: |
+          npm ci --ignore-scripts --no-fund --no-audit
+          npm run check
+          npm test
+          npm audit --omit=dev --audit-level=high
+
+      - name: Commit verified fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/apply-infinite-boot-fix-v42.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Corregge avvio infinito e aggiorna PWA alla versione 42"
+          git push origin HEAD:fix/infinite-boot-pwa-v42
