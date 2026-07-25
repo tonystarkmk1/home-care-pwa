@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = 'home-care-v43';
+  const APP_VERSION = 'home-care-v44';
   const standaloneQuery = window.matchMedia('(display-mode: standalone)');
   const userAgent = navigator.userAgent || '';
   const isIos = /iphone|ipad|ipod/i.test(userAgent);
@@ -138,7 +138,7 @@
   async function repairInstallation() {
     await clearPwaState();
     const url = new URL('/', window.location.origin);
-    url.searchParams.set('pwa_reset', '43');
+    url.searchParams.set('pwa_reset', '44');
     url.searchParams.set('cache_bust', String(Date.now()));
     window.location.replace(url.href);
   }
