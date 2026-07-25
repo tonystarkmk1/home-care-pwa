@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const { installGuidedChecks } = require('./guided-checks-v2');
+const { installSimpleUxV44 } = require('./simple-ux-v44');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -28,6 +29,7 @@ function installOperationalFeatures(dependencies) {
   }
 
   installGuidedChecks(dependencies);
+  installSimpleUxV44(dependencies);
 
   async function notifyCustomer(client, customerId, kind, title, body, linkTab, dedupeKey) {
     await q(

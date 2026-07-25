@@ -720,6 +720,9 @@ function createApp(options = {}) {
     const mail = email(req.body.email, { required: true });
     const phone = text(req.body.phone, { name: 'Telefono', max: 40 });
     const password = text(req.body.password, { name: 'Password', required: true, min: 10, max: 200, trim: false });
+    const selectedPlan = req.body.selected_plan
+      ? (await getPlan(req.body.selected_plan, pool, true)).id
+      : null;
     const rawCode = randomToken(32);
     const codeHash = tokenHash(rawCode);
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -728,8 +731,8 @@ function createApp(options = {}) {
       const duplicate = (await q('SELECT id FROM users WHERE LOWER(email)=LOWER($1)', [mail], client)).rows[0];
       if (duplicate) throw new HttpError(409, 'Email già registrata', 'EMAIL_EXISTS');
       const customer = (await q(
-        `INSERT INTO customers(name,email,phone,payment_status) VALUES($1,$2,$3,'unpaid') RETURNING *`,
-        [name, mail, phone],
+        `INSERT INTO customers(name,email,phone,current_package_type,payment_status) VALUES($1,$2,$3,$4,'unpaid') RETURNING *`,
+        [name, mail, phone, selectedPlan],
         client
       )).rows[0];
       const passwordHash = await bcrypt.hash(password, 12);

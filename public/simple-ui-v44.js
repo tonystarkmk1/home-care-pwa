@@ -21,6 +21,12 @@
     }[character]));
   }
 
+  function cssEscape(value) {
+    const raw = String(value || '');
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(raw);
+    return raw.replace(/[^a-zA-Z0-9_-]/g, '');
+  }
+
   function money(cents) {
     return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
       .format(Number(cents || 0) / 100);
@@ -257,6 +263,7 @@
 
   async function openPlanGate() {
     if (state.user?.role !== 'client') return;
+    if (state.planOverlay?.isConnected) return;
     const data = await clientData();
     if (data.customer.current_package_type) {
       state.planOverlay?.remove();
@@ -280,7 +287,7 @@
   }
 
   function clickTab(tab) {
-    const button = document.querySelector(`[data-action="set-tab"][data-tab="${CSS.escape(tab)}"]`);
+    const button = document.querySelector(`[data-action="set-tab"][data-tab="${cssEscape(tab)}"]`);
     if (button) button.click();
     else {
       const url = new URL(window.location.href);

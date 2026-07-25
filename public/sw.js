@@ -1,23 +1,25 @@
 'use strict';
 
-const SW_VERSION = 'home-care-v43';
+const SW_VERSION = 'home-care-v44';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const STATIC_ASSETS = [
   '/offline.html',
-  '/app.css?v=43',
-  '/app.js?v=43',
-  '/operations-v2.css?v=43',
-  '/guided-checks-v2.css?v=43',
-  '/operations-v2.js?v=43',
-  '/guided-checks-v2.js?v=43',
-  '/runtime-stability-v43.js?v=43',
-  '/pwa-v43.js?v=43',
-  '/manifest.json?v=43',
-  '/icon.svg?v=43',
-  '/icon-192.png?v=43',
-  '/icon-512.png?v=43',
-  '/apple-touch-icon.png?v=43',
-  '/favicon.ico?v=43',
+  '/app.css?v=44',
+  '/app.js?v=44',
+  '/operations-v2.css?v=44',
+  '/guided-checks-v2.css?v=44',
+  '/simple-ui-v44.css?v=44',
+  '/operations-v2.js?v=44',
+  '/guided-checks-v2.js?v=44',
+  '/simple-ui-v44.js?v=44',
+  '/runtime-stability-v44.js?v=44',
+  '/pwa-v44.js?v=44',
+  '/manifest.json?v=44',
+  '/icon.svg?v=44',
+  '/icon-192.png?v=44',
+  '/icon-512.png?v=44',
+  '/apple-touch-icon.png?v=44',
+  '/favicon.ico?v=44',
 ];
 
 function isSensitive(url) {

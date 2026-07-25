@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const RECOVERY_VERSION = '43';
+  const RECOVERY_VERSION = '44';
   const NativeMutationObserver = window.MutationObserver;
   let lastBootError = '';
 
@@ -15,7 +15,7 @@
     const element = elementFromRecord(record);
     if (!element) return false;
     return Boolean(element.closest(
-      '[data-install-app], .desktop-copy, .hc-notification-button, .hc-notification-count, .hc-notification-panel'
+      '[data-install-app], .desktop-copy, .hc-notification-button, .hc-notification-count, .hc-notification-panel, .hc-simple-mobile-nav, .hc-simple-sidebar, .hc-simple-overlay'
     ));
   }
 

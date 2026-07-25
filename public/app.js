@@ -778,7 +778,6 @@
       }
       if (kind === 'register') {
         const selected = data.selected_plan || '';
-        delete data.selected_plan;
         const response = await api('/api/auth/register', { method: 'POST', body: data });
         if (selected) localStorage.setItem('hc_selected_plan', selected);
         renderAuth('login');
