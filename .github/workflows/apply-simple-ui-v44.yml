@@ -82,7 +82,21 @@ jobs:
           npm ci --no-fund --no-audit
 
       - name: Controlli statici, sintattici e PWA
-        run: npm run check
+        shell: bash
+        run: |
+          set +e
+          npm run check 2>&1 | tee /tmp/simple-ui-v44-check.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/simple-ui-v44-check.log simple-ui-v44-check.log
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add simple-ui-v44-check.log
+            git commit -m 'Registra errore controlli Simple UI V44' || true
+            git push origin HEAD:agent/home-care-simple-ux-v44 || true
+            exit "$status"
+          fi
 
       - name: Verifica migrazioni e seed idempotenti
         run: |
@@ -101,6 +115,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f simple-ui-v44-check.log
           rm -f scripts/apply-simple-ui-v44.js
           rm -f .github/workflows/apply-simple-ui-v44.yml
           git config user.name 'github-actions[bot]'
