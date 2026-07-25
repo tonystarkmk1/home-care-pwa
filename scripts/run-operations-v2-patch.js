@@ -5,6 +5,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const scriptsDir = __dirname;
+const rootDir = path.join(scriptsDir, '..');
 const sourcePath = path.join(scriptsDir, 'apply-operations-v2.js');
 const generatedPath = path.join(scriptsDir, '.apply-operations-v2.generated.js');
 let source = fs.readFileSync(sourcePath, 'utf8');
@@ -25,7 +26,7 @@ source = source.replace(
 );
 
 function repairOperationsFrontend() {
-  const file = path.join(scriptsDir, '..', 'public', 'operations-v2.js');
+  const file = path.join(rootDir, 'public', 'operations-v2.js');
   let content = fs.readFileSync(file, 'utf8');
   const blockStart = content.indexOf('  function cssEscape(value) {');
   const blockEnd = content.indexOf('\n\n  function dateIT(value) {', blockStart);
@@ -42,12 +43,25 @@ function repairOperationsFrontend() {
 }
 
 function repairOperationsModule() {
-  const file = path.join(scriptsDir, '..', 'src', 'operations-v2.js');
+  const file = path.join(rootDir, 'src', 'operations-v2.js');
   let content = fs.readFileSync(file, 'utf8');
   content = content.replaceAll(
     'MAX(ch.completed_at::date) last_completed',
     'MAX(ch.completed_at::date)::text last_completed'
   );
+  fs.writeFileSync(file, content);
+}
+
+function repairServerErrorHandling() {
+  const file = path.join(rootDir, 'server3.js');
+  let content = fs.readFileSync(file, 'utf8');
+  content = content.replace(
+    '    if (status >= 500) {\n',
+    '    if (status >= 500 && !(error instanceof HttpError)) {\n'
+  );
+  if (!content.includes('status >= 500 && !(error instanceof HttpError)')) {
+    throw new Error('Gestione HttpError non aggiornata');
+  }
   fs.writeFileSync(file, content);
 }
 
@@ -59,6 +73,7 @@ try {
   if (run.status !== 0) process.exit(run.status || 1);
   repairOperationsFrontend();
   repairOperationsModule();
+  repairServerErrorHandling();
 } finally {
   fs.rmSync(generatedPath, { force: true });
 }
