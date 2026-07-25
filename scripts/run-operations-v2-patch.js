@@ -19,6 +19,10 @@ const end = source.indexOf(endToken, bodyStart);
 if (start < 0 || end < 0) throw new Error('Blocco testsAddition non trovato nella patch');
 const testBody = source.slice(bodyStart, end);
 source = `${source.slice(0, start)}const testsAddition = ${JSON.stringify(testBody)};\nappendOnce('tests/app.test.js'${source.slice(end + endToken.length)}`;
+source = source.replace(
+  'node --check scripts/apply-operations-v2.js',
+  'node --check scripts/run-operations-v2-patch.js'
+);
 
 fs.writeFileSync(generatedPath, source);
 try {
