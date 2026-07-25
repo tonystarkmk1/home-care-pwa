@@ -1,24 +1,26 @@
-name: Verifica funzioni operative Home Care
+name: Home Care CI
 
 on:
   push:
     branches:
-      - fix/mobile-operations-notifications-pwa
+      - main
+      - "fix/**"
+      - "agent/**"
   pull_request:
     branches:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: home-care-operations-${{ github.ref }}
-  cancel-in-progress: false
+  group: home-care-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16
@@ -38,21 +40,18 @@ jobs:
       PORT: 31337
       APP_URL: http://127.0.0.1:31337
       DATABASE_URL: postgresql://homecare:homecare@127.0.0.1:5432/homecare_test
-      JWT_SECRET: home-care-operations-test-secret-with-more-than-thirty-two-characters
-      ADMIN_NAME: Admin Operations Test
-      ADMIN_EMAIL: admin-operations@example.test
-      ADMIN_PASSWORD: Admin-password-Operations-2026!
+      JWT_SECRET: home-care-ci-secret-with-more-than-thirty-two-characters
+      ADMIN_NAME: Admin CI
+      ADMIN_EMAIL: admin-ci@example.test
+      ADMIN_PASSWORD: Admin-password-CI-2026!
       RESET_ADMIN_PASSWORD: "false"
-      STRIPE_WEBHOOK_SECRET: whsec_operations_test
+      STRIPE_WEBHOOK_SECRET: whsec_ci_test
       REGISTRATION_ENABLED: "true"
       BREVO_API_KEY: ""
       BREVO_SENDER_EMAIL: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-          fetch-depth: 0
 
       - name: Node.js 22.23.1
         uses: actions/setup-node@v4
@@ -60,44 +59,11 @@ jobs:
           node-version: 22.23.1
           cache: npm
 
-      - name: Applica integrazione idempotente
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/run-operations-v2-patch.js 2>&1 | tee operations-patch.log
-
-      - name: Prepara copia sorgente verificabile
-        shell: bash
-        run: tar --exclude=.git --exclude=node_modules -czf /tmp/operations-source.tgz .
-
-      - name: Salva sorgente e log integrazione
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: operations-source-${{ github.run_id }}
-          path: |
-            /tmp/operations-source.tgz
-            operations-patch.log
-          if-no-files-found: error
-          retention-days: 2
-
-      - name: Installa dipendenze e aggiorna lockfile
-        run: npm install --ignore-scripts --no-fund
+      - name: Installa dipendenze
+        run: npm ci --ignore-scripts --no-fund --no-audit
 
       - name: Controlli sintattici, statici e PWA
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run check 2>&1 | tee operations-check.log
-
-      - name: Salva log controlli
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: operations-check-${{ github.run_id }}
-          path: operations-check.log
-          if-no-files-found: warn
-          retention-days: 2
+        run: npm run check
 
       - name: Migrazioni e seed idempotenti
         run: |
@@ -106,35 +72,8 @@ jobs:
           npm run seed
           npm run seed
 
-      - name: Test integrazione, sicurezza e operazioni
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm test 2>&1 | tee operations-test.log
-
-      - name: Salva log test
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: operations-test-${{ github.run_id }}
-          path: operations-test.log
-          if-no-files-found: warn
-          retention-days: 2
+      - name: Test integrazione e sicurezza
+        run: npm test
 
       - name: Audit dipendenze di produzione
         run: npm audit --omit=dev --audit-level=high
-
-      - name: Registra i file verificati sul branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -f operations-patch.log operations-check.log operations-test.log operations-source.tgz
-          git add -A
-          if git diff --cached --quiet; then
-            echo "Nessuna modifica da registrare"
-            exit 0
-          fi
-          git commit -m "Aggiunge gestione operativa, notifiche e installazione PWA"
-          git push origin HEAD:fix/mobile-operations-notifications-pwa
