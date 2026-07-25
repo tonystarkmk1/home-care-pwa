@@ -11,14 +11,19 @@ function required(name) {
   return value;
 }
 
+function validatePassword(password) {
+  if (!password) throw new Error('ADMIN_PASSWORD deve essere configurata');
+  if (password.length < 12) throw new Error('ADMIN_PASSWORD deve contenere almeno 12 caratteri');
+}
+
 async function main() {
   const databaseUrl = required('DATABASE_URL');
   const email = required('ADMIN_EMAIL').toLowerCase();
-  const password = required('ADMIN_PASSWORD');
+  const password = String(process.env.ADMIN_PASSWORD || '');
   const name = String(process.env.ADMIN_NAME || 'Admin Home Care').trim();
+  const resetPassword = String(process.env.RESET_ADMIN_PASSWORD || '').toLowerCase() === 'true';
 
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('ADMIN_EMAIL non valida');
-  if (password.length < 12) throw new Error('ADMIN_PASSWORD deve contenere almeno 12 caratteri');
 
   const pool = new Pool({
     connectionString: databaseUrl,
@@ -29,6 +34,12 @@ async function main() {
   try {
     await client.query('BEGIN');
     const existing = (await client.query('SELECT id FROM users WHERE LOWER(email)=LOWER($1)', [email])).rows[0];
+
+    // La password serve soltanto per creare un nuovo amministratore o quando
+    // viene richiesta esplicitamente una reimpostazione. Un account esistente
+    // non deve bloccare ogni deploy a causa di una vecchia variabile Render.
+    if (!existing || resetPassword) validatePassword(password);
+
     if (!existing) {
       const passwordHash = await bcrypt.hash(password, 12);
       await client.query(
@@ -37,7 +48,7 @@ async function main() {
         [name, email, passwordHash]
       );
       console.log(`Admin creato: ${email}`);
-    } else if (process.env.RESET_ADMIN_PASSWORD === 'true') {
+    } else if (resetPassword) {
       const passwordHash = await bcrypt.hash(password, 12);
       await client.query(
         `UPDATE users
