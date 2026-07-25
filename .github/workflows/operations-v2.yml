@@ -61,7 +61,10 @@ jobs:
           cache: npm
 
       - name: Applica integrazione idempotente
-        run: node scripts/apply-operations-v2.js 2>&1 | tee operations-patch.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run-operations-v2-patch.js 2>&1 | tee operations-patch.log
 
       - name: Salva log integrazione
         if: always()
