@@ -41,6 +41,16 @@ function repairOperationsFrontend() {
   fs.writeFileSync(file, content);
 }
 
+function repairOperationsModule() {
+  const file = path.join(scriptsDir, '..', 'src', 'operations-v2.js');
+  let content = fs.readFileSync(file, 'utf8');
+  content = content.replaceAll(
+    'MAX(ch.completed_at::date) last_completed',
+    'MAX(ch.completed_at::date)::text last_completed'
+  );
+  fs.writeFileSync(file, content);
+}
+
 fs.writeFileSync(generatedPath, source);
 try {
   const check = spawnSync(process.execPath, ['--check', generatedPath], { stdio: 'inherit' });
@@ -48,6 +58,7 @@ try {
   const run = spawnSync(process.execPath, [generatedPath], { stdio: 'inherit' });
   if (run.status !== 0) process.exit(run.status || 1);
   repairOperationsFrontend();
+  repairOperationsModule();
 } finally {
   fs.rmSync(generatedPath, { force: true });
 }
