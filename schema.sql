@@ -415,3 +415,66 @@ CREATE TRIGGER trg_home_care_notify_extra_payment_update
 AFTER UPDATE OF status ON extra_payments
 FOR EACH ROW EXECUTE FUNCTION home_care_notify_extra_payment_change();
 -- OPERATIONS_V2_END
+
+-- GUIDED_CHECKS_V2_START
+CREATE TABLE IF NOT EXISTS property_check_templates (
+  property_id UUID PRIMARY KEY REFERENCES properties(id) ON DELETE CASCADE,
+  items_json JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(items_json)='array'),
+  updated_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS guided_checks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  started_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  check_id UUID REFERENCES checks(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'in_progress'
+    CHECK (status IN ('in_progress','draft','approved','canceled')),
+  overall_notes TEXT,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_guided_checks_one_open_property
+  ON guided_checks(property_id)
+  WHERE status IN ('in_progress','draft');
+CREATE INDEX IF NOT EXISTS idx_guided_checks_status_updated
+  ON guided_checks(status,updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS guided_check_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  guided_check_id UUID NOT NULL REFERENCES guided_checks(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  label TEXT NOT NULL,
+  checked BOOLEAN NOT NULL DEFAULT FALSE,
+  checked_at TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(guided_check_id,sort_order)
+);
+
+CREATE INDEX IF NOT EXISTS idx_guided_check_items_session
+  ON guided_check_items(guided_check_id,sort_order);
+
+CREATE TABLE IF NOT EXISTS guided_check_item_photos (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  guided_check_item_id UUID NOT NULL REFERENCES guided_check_items(id) ON DELETE CASCADE,
+  mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg','image/png','image/webp')),
+  original_name TEXT,
+  size_bytes INTEGER NOT NULL CHECK (size_bytes>0 AND size_bytes<=8388608),
+  sha256 TEXT NOT NULL,
+  image_data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_guided_check_item_photos_item
+  ON guided_check_item_photos(guided_check_item_id,created_at);
+-- GUIDED_CHECKS_V2_END
+

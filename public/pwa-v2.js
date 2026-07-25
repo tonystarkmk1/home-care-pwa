@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = 'home-care-v41';
+  const APP_VERSION = 'home-care-v42';
   const standaloneQuery = window.matchMedia('(display-mode: standalone)');
   const userAgent = navigator.userAgent || '';
   const isIos = /iphone|ipad|ipod/i.test(userAgent);
@@ -199,7 +199,7 @@
       await Promise.all(keys.filter((key) => key.startsWith('home-care-')).map((key) => caches.delete(key)));
     }
     const url = new URL('/', window.location.origin);
-    url.searchParams.set('pwa_reset', '41');
+    url.searchParams.set('pwa_reset', '42');
     window.location.replace(url.href);
   }
 

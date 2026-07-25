@@ -8,7 +8,8 @@ const root = path.join(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const required = [
   'server3.js', 'schema.sql', 'public/index.html', 'public/app.css', 'public/app.js',
-  'public/pwa-v2.js', 'public/operations-v2.js', 'public/operations-v2.css', 'public/sw.js', 'public/manifest.json', 'public/offline.html',
+  'public/pwa-v2.js', 'public/operations-v2.js', 'public/operations-v2.css', 'public/guided-checks-v2.js', 'public/guided-checks-v2.css', 'public/sw.js', 'public/manifest.json', 'public/offline.html',
+  'src/guided-checks-v2.js', 'tests/guided-checks.test.js',
   'scripts/migrate.js', 'scripts/seed.js', 'scripts/start-stable.js',
 ];
 required.forEach((file) => assert.ok(fs.existsSync(path.join(root, file)), `${file} mancante`));
@@ -18,6 +19,8 @@ const app = read('public/app.js');
 const installer = read('public/pwa-v2.js');
 const operations = read('public/operations-v2.js');
 const operationsCss = read('public/operations-v2.css');
+const guided = read('public/guided-checks-v2.js');
+const guidedBackend = read('src/guided-checks-v2.js');
 const schema = read('schema.sql');
 const worker = read('public/sw.js');
 const server = read('server3.js');
@@ -34,6 +37,8 @@ assert.match(index, /data-apply-update/);
 assert.match(index, /pwa-v2\.js/);
 assert.match(index, /operations-v2\.js/);
 assert.match(index, /operations-v2\.css/);
+assert.match(index, /guided-checks-v2\.js/);
+assert.match(index, /guided-checks-v2\.css/);
 
 assert.doesNotMatch(app, /localStorage\.setItem\([^)]*(token|session)/i, 'il token non deve essere salvato in localStorage');
 assert.doesNotMatch(app, /\sonclick=/i, 'app.js non deve generare onclick inline');
@@ -48,9 +53,15 @@ assert.match(worker, /\/api\//);
 assert.match(worker, /cache:\s*'no-store'/);
 assert.match(operations, /data-hc-action/);
 assert.match(operationsCss, /\.action-sheet\.open/);
+assert.match(guided, /Inizia controllo/);
+assert.match(guided, /Approva e invia report/);
+assert.match(guidedBackend, /property_check_templates/);
+assert.match(guidedBackend, /guided_check_item_photos/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS property_occupancies/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS notifications/);
 assert.match(schema, /home_care_next_available_date/);
+assert.match(schema, /CREATE TABLE IF NOT EXISTS guided_checks/);
+assert.match(schema, /CREATE TABLE IF NOT EXISTS property_check_templates/);
 
 assert.equal(packageJson.dependencies.multer, '2.2.0');
 assert.match(packageJson.scripts.check, /validate:static/);

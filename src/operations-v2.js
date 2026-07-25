@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { installGuidedChecks } = require('./guided-checks-v2');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -25,6 +26,8 @@ function installOperationalFeatures(dependencies) {
   if (!app || !q || !transaction || !auth || !role || !asyncHandler) {
     throw new Error('Dipendenze operations-v2 incomplete');
   }
+
+  installGuidedChecks(dependencies);
 
   async function notifyCustomer(client, customerId, kind, title, body, linkTab, dedupeKey) {
     await q(
