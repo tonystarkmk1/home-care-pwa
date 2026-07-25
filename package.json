@@ -11,7 +11,7 @@
     "seed": "node scripts/seed.js",
     "predeploy": "npm run migrate && npm run seed",
     "validate:static": "node scripts/validate-static.js",
-    "check": "node --check server3.js && node --check src/operations-v2.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/validate-static.js && node --check scripts/run-operations-v2-patch.js && node --check public/app.js && node --check public/operations-v2.js && node --check public/pwa-v2.js && node --check public/sw.js && node --check tests/app.test.js && npm run validate:static",
+    "check": "node --check server3.js && node --check src/operations-v2.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/validate-static.js && node --check public/app.js && node --check public/operations-v2.js && node --check public/pwa-v2.js && node --check public/sw.js && node --check tests/app.test.js && npm run validate:static",
     "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
   "engines": {
