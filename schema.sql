@@ -216,3 +216,202 @@ VALUES
   ('personalizzato','Personalizzato',3900,'da 39 €/mese','["Base obbligatorio con 1 controllo mensile","Servizi aggiuntivi scelti con Home Care","Prezzo definitivo confermato prima del pagamento"]'::jsonb,30,TRUE,TRUE,50),
   ('localita_limitrofe','Località Limitrofe (legacy)',15000,'da 150 €/mese','["Piano storico mantenuto solo per migrazione"]'::jsonb,30,TRUE,FALSE,90)
 ON CONFLICT (id) DO NOTHING;
+
+-- OPERATIONS_V2_START
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_notifications BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE TABLE IF NOT EXISTS property_occupancies (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  note TEXT,
+  source_role TEXT NOT NULL DEFAULT 'client' CHECK (source_role IN ('client','admin')),
+  created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (end_date >= start_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_property_occupancies_property_dates
+  ON property_occupancies(property_id,start_date,end_date);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  link_tab TEXT,
+  read_at TIMESTAMPTZ,
+  email_status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (email_status IN ('pending','sending','sent','skipped','failed')),
+  email_attempts INTEGER NOT NULL DEFAULT 0 CHECK (email_attempts BETWEEN 0 AND 20),
+  email_sent_at TIMESTAMPTZ,
+  email_error TEXT,
+  dedupe_key TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_user_dedupe
+  ON notifications(user_id,dedupe_key);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
+  ON notifications(user_id,created_at DESC) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_email_queue
+  ON notifications(email_status,created_at) WHERE email_status IN ('pending','sending');
+
+CREATE OR REPLACE FUNCTION home_care_next_available_date(p_property_id UUID,p_candidate DATE)
+RETURNS DATE
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  candidate DATE := GREATEST(COALESCE(p_candidate,CURRENT_DATE),CURRENT_DATE);
+  occupied_until DATE;
+BEGIN
+  LOOP
+    SELECT MAX(end_date)
+      INTO occupied_until
+      FROM property_occupancies
+     WHERE property_id=p_property_id
+       AND candidate BETWEEN start_date AND end_date;
+    EXIT WHEN occupied_until IS NULL;
+    candidate := occupied_until + 1;
+  END LOOP;
+  RETURN candidate;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION home_care_notify_message_insert()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.sender_role='admin' THEN
+    INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+    SELECT u.id,'message','Nuovo messaggio da Home Care',LEFT(NEW.body,1000),'chat','message:'||NEW.id::text
+      FROM users u
+     WHERE u.customer_id=NEW.customer_id AND u.role='client'
+    ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+  ELSE
+    INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+    SELECT u.id,'message','Nuovo messaggio da '||NEW.sender_name,LEFT(NEW.body,1000),'messages','message:'||NEW.id::text
+      FROM users u
+     WHERE u.role='admin'
+    ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_home_care_notify_message ON messages;
+CREATE TRIGGER trg_home_care_notify_message
+AFTER INSERT ON messages
+FOR EACH ROW EXECUTE FUNCTION home_care_notify_message_insert();
+
+CREATE OR REPLACE FUNCTION home_care_notify_check_insert()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.status='done' THEN
+    INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+    SELECT u.id,'report','Nuovo report disponibile','Il report del controllo di '||p.name||' è pronto.','reports','check-done:'||NEW.id::text
+      FROM properties p
+      JOIN users u ON u.customer_id=p.customer_id AND u.role='client'
+     WHERE p.id=NEW.property_id
+    ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_home_care_notify_check ON checks;
+CREATE TRIGGER trg_home_care_notify_check
+AFTER INSERT ON checks
+FOR EACH ROW EXECUTE FUNCTION home_care_notify_check_insert();
+
+CREATE OR REPLACE FUNCTION home_care_notify_customer_payment_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  notification_title TEXT;
+  notification_body TEXT;
+  notification_key TEXT;
+BEGIN
+  IF NEW.payment_status IS NOT DISTINCT FROM OLD.payment_status
+     AND NEW.paid_until IS NOT DISTINCT FROM OLD.paid_until THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.payment_status='paid' THEN
+    notification_title := 'Pagamento registrato';
+    notification_body := CASE WHEN NEW.paid_until IS NULL
+      THEN 'Il servizio Home Care risulta attivo.'
+      ELSE 'Il servizio Home Care risulta pagato fino al '||TO_CHAR(NEW.paid_until,'DD/MM/YYYY')||'.' END;
+  ELSE
+    notification_title := 'Pagamento da regolarizzare';
+    notification_body := 'Lo stato del servizio è '||NEW.payment_status||'. Apri Pagamenti per verificare.';
+  END IF;
+  notification_key := 'customer-payment:'||NEW.id::text||':'||NEW.payment_status||':'||COALESCE(NEW.paid_until::text,'none')||':'||txid_current()::text;
+
+  INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+  SELECT u.id,'payment',notification_title,notification_body,'payments',notification_key
+    FROM users u
+   WHERE u.customer_id=NEW.id AND u.role='client'
+  ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+
+  IF NEW.payment_status='paid' THEN
+    INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+    SELECT u.id,'payment','Pagamento cliente registrato',NEW.name||': '||notification_body,'payments',notification_key
+      FROM users u WHERE u.role='admin'
+    ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_home_care_notify_customer_payment ON customers;
+CREATE TRIGGER trg_home_care_notify_customer_payment
+AFTER UPDATE OF payment_status,paid_until ON customers
+FOR EACH ROW EXECUTE FUNCTION home_care_notify_customer_payment_update();
+
+CREATE OR REPLACE FUNCTION home_care_notify_extra_payment_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  customer_name TEXT;
+  key_value TEXT;
+BEGIN
+  SELECT name INTO customer_name FROM customers WHERE id=NEW.customer_id;
+  IF TG_OP='INSERT' THEN
+    key_value := 'extra-payment-created:'||NEW.id::text;
+    INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+    SELECT u.id,'payment','Nuovo preventivo disponibile',NEW.description||' · €'||TO_CHAR(NEW.amount_cents/100.0,'FM999999990.00'),'payments',key_value
+      FROM users u WHERE u.customer_id=NEW.customer_id AND u.role='client'
+    ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+  ELSIF NEW.status IS DISTINCT FROM OLD.status THEN
+    key_value := 'extra-payment-status:'||NEW.id::text||':'||NEW.status;
+    INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+    SELECT u.id,'payment',CASE WHEN NEW.status='paid' THEN 'Pagamento ricevuto' ELSE 'Preventivo aggiornato' END,
+           NEW.description||' · Stato: '||NEW.status,'payments',key_value
+      FROM users u WHERE u.customer_id=NEW.customer_id AND u.role='client'
+    ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+    IF NEW.status='paid' THEN
+      INSERT INTO notifications(user_id,kind,title,body,link_tab,dedupe_key)
+      SELECT u.id,'payment','Preventivo pagato',COALESCE(customer_name,'Cliente')||': '||NEW.description,'payments',key_value
+        FROM users u WHERE u.role='admin'
+      ON CONFLICT (user_id,dedupe_key) DO NOTHING;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_home_care_notify_extra_payment_insert ON extra_payments;
+CREATE TRIGGER trg_home_care_notify_extra_payment_insert
+AFTER INSERT ON extra_payments
+FOR EACH ROW EXECUTE FUNCTION home_care_notify_extra_payment_change();
+DROP TRIGGER IF EXISTS trg_home_care_notify_extra_payment_update ON extra_payments;
+CREATE TRIGGER trg_home_care_notify_extra_payment_update
+AFTER UPDATE OF status ON extra_payments
+FOR EACH ROW EXECUTE FUNCTION home_care_notify_extra_payment_change();
+-- OPERATIONS_V2_END

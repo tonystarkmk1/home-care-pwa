@@ -1,0 +1,187 @@
+/* Correzione menu: backdrop e pannello sono elementi fratelli, non annidati. */
+.sheet-backdrop {
+  pointer-events: none;
+}
+.sheet-backdrop.open {
+  pointer-events: auto;
+}
+.action-sheet {
+  position: fixed;
+  z-index: 90;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: translateY(calc(100% + 24px));
+  visibility: hidden;
+  pointer-events: none;
+}
+.action-sheet.open {
+  transform: translateY(0);
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.hc-notification-button {
+  position: relative;
+}
+.hc-notification-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--navy-900);
+  border-radius: 999px;
+  padding: 0 4px;
+  color: #fff;
+  background: var(--red-700);
+  font-size: .62rem;
+  font-weight: 950;
+}
+.hc-notification-panel {
+  position: fixed;
+  z-index: 145;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  background: rgba(4,25,35,.62);
+  backdrop-filter: blur(5px);
+}
+.hc-notification-panel[hidden] { display: none !important; }
+.hc-notification-card {
+  width: 100%;
+  max-height: min(88vh, 780px);
+  overflow: auto;
+  border-radius: 26px 26px 0 0;
+  padding: 15px 14px calc(18px + var(--safe-bottom));
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.hc-notification-header,
+.hc-operation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.hc-notification-header { margin-bottom: 12px; }
+.hc-notification-header h2,
+.hc-operation-heading h2,
+.hc-operation-heading h3 { margin: 0; color: var(--navy-900); }
+.hc-notification-list { display: grid; gap: 8px; }
+.hc-notification-item {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 11px;
+  text-align: left;
+  color: var(--ink);
+  background: #fff;
+}
+.hc-notification-item.unread {
+  border-color: #8bc7c8;
+  background: #effafa;
+  box-shadow: inset 4px 0 0 var(--teal-600);
+}
+.hc-notification-item strong { color: var(--navy-900); }
+.hc-notification-item small { color: var(--muted); }
+.hc-notification-preferences {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.hc-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hc-operation-card {
+  margin-top: 14px;
+}
+.hc-operation-grid {
+  display: grid;
+  gap: 12px;
+}
+.hc-occupancy-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+.hc-occupancy-item {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 11px;
+  background: #fff;
+}
+.hc-occupancy-item.active-period {
+  border-color: #efd99b;
+  background: #fff9e8;
+}
+.hc-occupancy-item .data-actions { margin-top: 8px; }
+
+.hc-report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.hc-report-editor {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--surface-2);
+}
+.hc-report-editor summary {
+  cursor: pointer;
+  color: var(--navy-900);
+  font-weight: 850;
+}
+.hc-report-editor[open] summary { margin-bottom: 12px; }
+.hc-photo-wrap { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 13px; }
+.hc-photo-wrap .photo-link { width: 100%; height: 100%; display: block; }
+.hc-photo-delete {
+  position: absolute;
+  z-index: 2;
+  top: 5px;
+  right: 5px;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  padding: 0;
+  color: #fff;
+  background: rgba(163,38,28,.94);
+  box-shadow: 0 5px 14px rgba(4,25,35,.22);
+}
+.hc-danger-zone {
+  border-color: #efc2bb;
+  background: #fff7f5;
+}
+
+@media (min-width: 780px) {
+  .hc-notification-panel {
+    align-items: start;
+    justify-items: end;
+    padding: calc(72px + var(--safe-top)) 18px 18px;
+  }
+  .hc-notification-card {
+    width: min(440px, calc(100vw - 36px));
+    max-height: calc(100vh - 100px);
+    border-radius: 22px;
+  }
+  .hc-operation-grid.two { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .action-sheet { max-width: 460px; left: auto; right: 14px; bottom: 14px; border-radius: 24px; }
+}

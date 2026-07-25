@@ -8,14 +8,17 @@ const root = path.join(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const required = [
   'server3.js', 'schema.sql', 'public/index.html', 'public/app.css', 'public/app.js',
-  'public/install-app.js', 'public/sw.js', 'public/manifest.json', 'public/offline.html',
+  'public/pwa-v2.js', 'public/operations-v2.js', 'public/operations-v2.css', 'public/sw.js', 'public/manifest.json', 'public/offline.html',
   'scripts/migrate.js', 'scripts/seed.js', 'scripts/start-stable.js',
 ];
 required.forEach((file) => assert.ok(fs.existsSync(path.join(root, file)), `${file} mancante`));
 
 const index = read('public/index.html');
 const app = read('public/app.js');
-const installer = read('public/install-app.js');
+const installer = read('public/pwa-v2.js');
+const operations = read('public/operations-v2.js');
+const operationsCss = read('public/operations-v2.css');
+const schema = read('schema.sql');
 const worker = read('public/sw.js');
 const server = read('server3.js');
 const start = read('scripts/start-stable.js');
@@ -28,7 +31,9 @@ assert.doesNotMatch(index, /\sstyle\s*=/i, 'index.html contiene stile inline');
 assert.doesNotMatch(index, /javascript:/i, 'index.html contiene URL javascript');
 assert.match(index, /viewport-fit=cover/);
 assert.match(index, /data-apply-update/);
-assert.match(index, /install-app\.js/);
+assert.match(index, /pwa-v2\.js/);
+assert.match(index, /operations-v2\.js/);
+assert.match(index, /operations-v2\.css/);
 
 assert.doesNotMatch(app, /localStorage\.setItem\([^)]*(token|session)/i, 'il token non deve essere salvato in localStorage');
 assert.doesNotMatch(app, /\sonclick=/i, 'app.js non deve generare onclick inline');
@@ -41,11 +46,16 @@ assert.match(installer, /samsungbrowser/i);
 assert.match(installer, /controllerchange/);
 assert.match(worker, /\/api\//);
 assert.match(worker, /cache:\s*'no-store'/);
+assert.match(operations, /data-hc-action/);
+assert.match(operationsCss, /\.action-sheet\.open/);
+assert.match(schema, /CREATE TABLE IF NOT EXISTS property_occupancies/);
+assert.match(schema, /CREATE TABLE IF NOT EXISTS notifications/);
+assert.match(schema, /home_care_next_available_date/);
 
 assert.equal(packageJson.dependencies.multer, '2.2.0');
 assert.match(packageJson.scripts.check, /validate:static/);
 assert.match(packageJson.scripts.test, /node --test/);
-assert.equal(packageJson.engines.node, '>=20.11');
+assert.equal(packageJson.engines.node, '22.23.1');
 
 assert.doesNotMatch(start, /patch-/i, 'start-stable non deve applicare patch runtime');
 assert.match(start, /start\(\)/);
@@ -56,7 +66,9 @@ assert.match(server, /stripe\.webhooks\.constructEvent|stripeClient\.webhooks\.c
 assert.match(server, /check_photos/);
 assert.doesNotMatch(server, /express\.static\([^)]*uploads/i, 'gli upload non devono essere pubblici');
 
+assert.equal(manifest.id, '/');
 assert.equal(manifest.display, 'standalone');
+assert.deepEqual(manifest.display_override, ['standalone']);
 assert.equal(manifest.scope, '/');
 assert.ok(manifest.icons.some((icon) => icon.sizes === '192x192'));
 assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512'));

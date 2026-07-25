@@ -13,6 +13,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const Stripe = require('stripe');
 const { Pool } = require('pg');
+const { installOperationalFeatures } = require('./src/operations-v2');
 const { version: APP_VERSION } = require('./package.json');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -1090,6 +1091,7 @@ function createApp(options = {}) {
               CASE WHEN ${paidSql('c')} THEN FALSE ELSE TRUE END blocked
          FROM properties p JOIN customers c ON c.id=p.customer_id
         WHERE p.active=TRUE AND p.request_status='approved' AND p.next_check_date<=CURRENT_DATE
+          AND NOT EXISTS (SELECT 1 FROM property_occupancies o WHERE o.property_id=p.id AND CURRENT_DATE BETWEEN o.start_date AND o.end_date)
         ORDER BY blocked,p.next_check_date,c.name`
     )).rows;
     res.json({ checks });
@@ -1125,6 +1127,13 @@ function createApp(options = {}) {
       if (!property) throw new HttpError(404, 'Immobile non trovato', 'NOT_FOUND');
       if (!property.active || property.request_status !== 'approved') throw new HttpError(409, 'Immobile non attivo', 'PROPERTY_INACTIVE');
       if (!property.payment_valid) throw new HttpError(402, 'Pagamento non regolare: controllo sospeso', 'PAYMENT_REQUIRED');
+      const occupied = (await q(
+        `SELECT id,start_date,end_date FROM property_occupancies
+          WHERE property_id=$1 AND CURRENT_DATE BETWEEN start_date AND end_date LIMIT 1`,
+        [propertyId],
+        client
+      )).rows[0];
+      if (occupied) throw new HttpError(409, `La casa risulta occupata fino al ${occupied.end_date}. Il controllo non è necessario.`, 'PROPERTY_OCCUPIED');
       const row = (await q(
         `INSERT INTO checks(property_id,due_date,completed_at,status,notes,checklist_json)
          VALUES($1,CURRENT_DATE,NOW(),'done',$2,$3::jsonb) RETURNING *`,
@@ -1140,7 +1149,7 @@ function createApp(options = {}) {
         );
       }
       await q(
-        `UPDATE properties SET next_check_date=CURRENT_DATE+$2::int,updated_at=NOW() WHERE id=$1`,
+        `UPDATE properties SET next_check_date=home_care_next_available_date($1,CURRENT_DATE+$2::int),updated_at=NOW() WHERE id=$1`,
         [propertyId, Number(property.days || 30)],
         client
       );
@@ -1216,7 +1225,7 @@ function createApp(options = {}) {
     const lat = numberValue(req.query.lat ?? 40.9663, { name: 'Latitudine', min: -90, max: 90, required: true });
     const lng = numberValue(req.query.lng ?? 8.8814, { name: 'Longitudine', min: -180, max: 180, required: true });
     const onlyDue = req.query.onlyDue !== '0';
-    const conditions = [`p.active=TRUE`, `p.request_status='approved'`, `p.latitude IS NOT NULL`, `p.longitude IS NOT NULL`, paidSql('c')];
+    const conditions = [`p.active=TRUE`, `p.request_status='approved'`, `p.latitude IS NOT NULL`, `p.longitude IS NOT NULL`, paidSql('c'), `NOT EXISTS (SELECT 1 FROM property_occupancies o WHERE o.property_id=p.id AND CURRENT_DATE BETWEEN o.start_date AND o.end_date)`];
     if (onlyDue) conditions.push('p.next_check_date<=CURRENT_DATE');
     const rows = (await q(
       `SELECT p.id,p.name,p.address,p.latitude,p.longitude,p.package_type,c.name customer_name,c.phone customer_phone
@@ -1682,6 +1691,11 @@ function createApp(options = {}) {
     res.json({ url: session.url, payment });
   }));
 
+  installOperationalFeatures({
+    app, q, transaction, auth, role, asyncHandler, upload, uuid, text, isoDate, listOfStrings,
+    HttpError, config, mailer, imageType, safeOriginalName,
+  });
+
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint non trovato', code: 'NOT_FOUND' }));
   app.get('*', (_req, res) => {
     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -1703,7 +1717,7 @@ function createApp(options = {}) {
       code = 'DUPLICATE_VALUE';
       message = 'Esiste già un elemento con questi dati';
     }
-    if (status >= 500) {
+    if (status >= 500 && !(error instanceof HttpError)) {
       const errorId = crypto.randomUUID();
       console.error(`[${errorId}]`, error);
       message = 'Errore interno del server';
@@ -1726,6 +1740,7 @@ async function start() {
   });
   const shutdown = async (signal) => {
     console.log(`${signal}: arresto in corso...`);
+    app.locals.operationsV2?.stop?.();
     server.close(async () => {
       await pool.end().catch(() => null);
       process.exit(0);

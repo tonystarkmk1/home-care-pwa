@@ -1,6 +1,6 @@
 {
   "name": "home-care-pwa",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "PWA mobile-first e sicura per la gestione Home Care.",
   "main": "server3.js",
@@ -11,11 +11,11 @@
     "seed": "node scripts/seed.js",
     "predeploy": "npm run migrate && npm run seed",
     "validate:static": "node scripts/validate-static.js",
-    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/validate-static.js && node --check public/app.js && node --check public/install-app.js && node --check public/sw.js && node --check tests/app.test.js && npm run validate:static",
+    "check": "node --check server3.js && node --check src/operations-v2.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/validate-static.js && node --check public/app.js && node --check public/operations-v2.js && node --check public/pwa-v2.js && node --check public/sw.js && node --check tests/app.test.js && npm run validate:static",
     "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
   "engines": {
-    "node": ">=20.11"
+    "node": "22.23.1"
   },
   "dependencies": {
     "bcryptjs": "2.4.3",
