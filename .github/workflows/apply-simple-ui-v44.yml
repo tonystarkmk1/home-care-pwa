@@ -11,6 +11,16 @@ on:
       - 'tests/simple-ui-v44.test.js'
       - 'scripts/apply-simple-ui-v44.js'
       - '.github/workflows/apply-simple-ui-v44.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/simple-ux-v44.js'
+      - 'public/simple-ui-v44.js'
+      - 'public/simple-ui-v44.css'
+      - 'tests/simple-ui-v44.test.js'
+      - 'scripts/apply-simple-ui-v44.js'
+      - '.github/workflows/apply-simple-ui-v44.yml'
 
 permissions:
   contents: write
