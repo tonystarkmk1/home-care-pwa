@@ -1,33 +1,31 @@
 {
   "name": "home-care-pwa",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "PWA gestionale Home Care per clienti, immobili, GPS, controlli, report, dashboard e pagamenti Stripe.",
+  "description": "PWA mobile-first e sicura per la gestione Home Care.",
   "main": "server3.js",
   "scripts": {
     "start": "node scripts/start-stable.js",
-    "dev": "nodemon server3.js",
+    "dev": "NODE_ENV=development node --watch scripts/start-stable.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "predeploy": "npm run migrate && npm run seed",
-    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/generate-pwa-png-icons.js && node --check scripts/patch-install-button-only.js && node --check scripts/patch-custom-plan-v1.js && node --check scripts/patch-contacts-v1.js && node --check scripts/patch-client-pay-date-v1.js && node --check scripts/patch-plan-settings-v1.js && node --check scripts/patch-admin-custom-pricing-v1.js && node --check public/custom-plan-v1.js && node --check public/contacts-v1.js && node --check public/client-pay-date-v1.js && node --check public/plan-settings-v1.js && node --check public/client-onboarding-v1.js && node --check public/admin-custom-pricing-v1.js && node --check public/install-app.js"
+    "validate:static": "node scripts/validate-static.js",
+    "check": "node --check server3.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/start-stable.js && node --check scripts/validate-static.js && node --check public/app.js && node --check public/install-app.js && node --check public/sw.js && node --check tests/app.test.js && npm run validate:static",
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.11"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "helmet": "^7.2.0",
-    "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
-    "multer": "^1.4.5-lts.1",
-    "pg": "^8.13.1",
-    "stripe": "^17.5.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.9"
+    "bcryptjs": "2.4.3",
+    "dotenv": "16.4.7",
+    "express": "4.22.2",
+    "helmet": "7.2.0",
+    "jsonwebtoken": "9.0.2",
+    "morgan": "1.11.0",
+    "multer": "2.2.0",
+    "pg": "8.22.0",
+    "stripe": "17.5.0"
   }
 }

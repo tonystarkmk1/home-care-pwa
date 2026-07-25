@@ -1,140 +1,146 @@
 # Home Care PWA
 
-PWA gestionale per il servizio Home Care: clienti, immobili, controlli periodici, GPS, giri di controllo, report fotografici, Stripe, pagamenti manuali e comunicazioni cliente/admin.
+Gestionale mobile-first per il servizio Home Care. Riunisce area cliente, area amministrativa e operatività degli aiutanti in una PWA installabile, con immobili, controlli, fotografie private, report, attività, giro GPS, messaggi, contatti, piani e pagamenti.
 
-## Funzioni incluse
+## Funzioni principali
 
-### Area admin
+### Cliente
 
-- Login admin.
-- Gestione clienti, immobili e aiutanti.
-- Dashboard con richieste immobili, controlli da fare, controlli bloccati per pagamento non regolare e cose da fare.
-- Servizi visibili per ogni immobile:
-  - Base: 39 €/mese
-  - Comfort: 79 €/mese
-  - Premium: 199 €/mese
-  - Villa & Giardino: da 300 €/mese
-  - Località Limitrofe: da 150 €/mese
-- Salvataggio GPS dell'immobile e apertura rapida su Google Maps.
-- Calcolo giro controlli ordinato per distanza dalla posizione attuale.
-- Checklist diversa in base al servizio.
-- Report controllo con note e foto.
-- Pagamenti extra/manutenzioni e registrazione pagamenti manuali.
+- registrazione con conferma email e recupero password;
+- richiesta e consultazione degli immobili;
+- stato del piano e pagamento mensile o annuale;
+- preventivi e servizi extra;
+- report dei controlli con fotografie protette;
+- chat e contatti ufficiali Home Care;
+- installazione guidata su iPhone, iPad, Android e desktop.
 
-### Area cliente
+### Amministratore
 
-- Registrazione cliente con conferma email.
-- Inserimento immobili da affidare a Home Care.
-- Visualizzazione stato pagamento, immobili, report e pagamenti extra.
-- Chat Home Care cliente/admin.
+- dashboard operativa e richieste immobili;
+- clienti, immobili, GPS e aiutanti;
+- controlli con checklist, note e fotografie;
+- report, attività e giro ordinato per distanza;
+- pagamenti manuali, Stripe e preventivi extra;
+- messaggi e contatti;
+- listino modificabile e piani personalizzati per cliente.
+
+### Aiutante
+
+L'aiutante può gestire immobili, controlli, report, attività e giro. Gli importi e le funzioni economiche restano riservati all'amministratore.
+
+## Interfaccia mobile-first
+
+La navigazione usa una barra inferiore sui telefoni, azioni touch da almeno 44–48 px, safe area per iPhone, pannelli adatti all'uso con una mano e tabelle convertite in schede responsive. Su desktop viene mostrata una barra laterale completa.
+
+L'installazione segue lo stesso approccio del gestionale ASD:
+
+- prompt nativo quando il browser lo espone;
+- istruzioni dedicate a Safari iOS, Chrome, Edge e Samsung Internet;
+- pulsante sempre disponibile finché l'app non è installata;
+- avviso offline;
+- notifica quando un nuovo service worker è pronto;
+- cache limitata ai soli asset pubblici, mai API, fotografie o dati riservati.
+
+## Sicurezza
+
+- sessione in cookie `HttpOnly`, senza JWT in `localStorage`;
+- CSRF, controllo dell'origine, CSP, header Helmet e rate limiting;
+- validazione server e vincoli PostgreSQL per ruoli, piani e stati;
+- importi Stripe calcolati dal database, non dal browser;
+- webhook Stripe firmato e idempotente;
+- fotografie JPEG, PNG o WebP validate tramite firma binaria, massimo 8 MB ciascuna, salvate in PostgreSQL e servite solo dopo autorizzazione;
+- codici email e password reset generati con `crypto.randomBytes` e memorizzati come hash;
+- cancellazioni e attivazioni complesse eseguite in transazione.
+
+## Requisiti
+
+- Node.js 20.11 o superiore; Node.js 22 è usato in CI;
+- PostgreSQL 16 consigliato;
+- HTTPS in produzione.
+
+## Avvio locale
+
+```bash
+cp .env.example .env
+npm install
+npm run migrate
+npm run seed
+npm start
+```
+
+Apri `http://localhost:3000`.
+
+`npm run seed` crea l'amministratore solo se non esiste. Per reimpostarne intenzionalmente la password, imposta temporaneamente `RESET_ADMIN_PASSWORD=true`.
+
+## Controlli automatici
+
+```bash
+npm run check
+npm test
+npm audit --omit=dev --audit-level=high
+```
+
+La workflow GitHub Actions avvia PostgreSQL, installa le dipendenze, esegue i controlli statici e PWA, applica due volte la migrazione e il seed per verificarne l'idempotenza, lancia i test di integrazione e infine esegue l'audit delle dipendenze.
 
 ## Deploy su Render
 
-Il repo contiene un `render.yaml` pronto per il deploy tramite Blueprint.
+Il file `render.yaml` crea un servizio Node e un database PostgreSQL. Durante la creazione del Blueprint inserisci almeno:
 
-La configurazione crea:
+- `ADMIN_EMAIL`;
+- `ADMIN_PASSWORD`, lunga almeno 12 caratteri.
 
-- un Web Service Node (`home-care-pwa`);
-- un database Render Postgres (`home-care-db`);
-- `DATABASE_URL` collegata automaticamente al database;
-- migrazioni e seed admin eseguiti nel `preDeployCommand`;
-- start stabile con `npm start`.
-
-### Passi
-
-1. Vai su Render e scegli **New > Blueprint**.
-2. Collega questo repository GitHub.
-3. Quando Render chiede le variabili `sync: false`, compila:
-   - `ADMIN_EMAIL`: email admin iniziale;
-   - `ADMIN_PASSWORD`: password admin iniziale.
-4. Avvia il Blueprint.
-5. A deploy concluso, apri l'URL `onrender.com` del servizio e accedi con `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
-
-Per il primo test non serve configurare Stripe o Brevo. Se Brevo non è configurato, dopo la registrazione cliente l'app mostra un link di conferma di test.
-
-### Comandi usati da Render
+Il deploy esegue:
 
 ```bash
-npm install && npm run check
+npm ci --ignore-scripts && npm run check
 npm run predeploy
 npm start
 ```
 
-`npm run predeploy` esegue:
+`predeploy` applica le migrazioni e prepara l'amministratore senza sovrascriverne la password esistente.
 
-```bash
-npm run migrate && npm run seed
-```
+### Email
 
-## Variabili ambiente
+Per inviare conferme e recuperi password configura:
 
-| Variabile | Obbligatoria | Note |
-| --- | --- | --- |
-| `NODE_ENV` | Sì | Su Render è `production`. |
-| `DATABASE_URL` | Sì | Inserita automaticamente dal Blueprint tramite Render Postgres. |
-| `JWT_SECRET` | Sì | Generata automaticamente da Render. |
-| `ADMIN_EMAIL` | Sì | Email admin iniziale. |
-| `ADMIN_PASSWORD` | Sì | Password admin iniziale. |
-| `APP_WHATSAPP` | No | Default Blueprint: `80872207`. |
-| `BREVO_SENDER_NAME` | No | Default Blueprint: `Home Care`. |
-| `UPLOAD_DIR` | Sì | Default: `uploads`. |
+- `BREVO_API_KEY`;
+- `BREVO_SENDER_EMAIL`;
+- `BREVO_SENDER_NAME`.
 
-Variabili opzionali da aggiungere manualmente in Render quando vuoi attivare funzioni esterne:
+Senza Brevo, in ambiente non produttivo l'API restituisce un link di prova. In produzione la registrazione viene resa non disponibile finché il canale email non è configurato; può essere disattivata esplicitamente con `REGISTRATION_ENABLED=false`.
 
-| Variabile | Quando serve |
-| --- | --- |
-| `APP_URL` | Quando colleghi un dominio o vuoi forzare l'URL pubblico dell'app. |
-| `STRIPE_SECRET_KEY` | Per attivare Stripe. |
-| `STRIPE_WEBHOOK_SECRET` | Per verificare i webhook Stripe. |
-| `BREVO_API_KEY` | Per inviare email reali. |
-| `BREVO_SENDER_EMAIL` | Mittente email Brevo. |
+### Stripe
 
-## Stripe
+Configura insieme:
 
-Quando vuoi attivare Stripe, imposta il webhook verso:
+- `STRIPE_SECRET_KEY`;
+- `STRIPE_WEBHOOK_SECRET`.
+
+Webhook:
 
 ```text
-https://TUO-DOMINIO-RENDER/api/stripe/webhook
+https://TUO-DOMINIO/api/stripe/webhook
 ```
 
-Eventi consigliati:
+Eventi gestiti:
 
-- `checkout.session.completed`
-- `invoice.paid`
-- `invoice.payment_failed`
-- `customer.subscription.deleted`
+- `checkout.session.completed`;
+- `invoice.paid`;
+- `invoice.payment_failed`;
+- `customer.subscription.updated`;
+- `customer.subscription.deleted`.
 
-## Nota importante sulle foto
+L'app rifiuta l'avvio se è presente la chiave Stripe ma manca il secret del webhook.
 
-La cartella `uploads` salva le foto sul filesystem del servizio. Su Render va bene per una prova, ma per uso reale conviene passare in futuro a un servizio esterno come Cloudinary o S3, così le foto restano salvate anche dopo aggiornamenti o redeploy.
+## Dati e fotografie
 
-## Installazione locale
+Le fotografie dei controlli vengono salvate in PostgreSQL, non nel filesystem effimero di Render. Gli URL delle immagini richiedono una sessione valida e verificano che il cliente sia proprietario dell'immobile; amministratori e aiutanti possono accedervi per motivi operativi.
 
-1. Installa Node.js 20 o superiore.
-2. Crea un database PostgreSQL.
-3. Copia `.env.example` in `.env` e modifica i valori.
-4. Installa le dipendenze:
+## Struttura
 
-```bash
-npm install
-```
-
-5. Crea le tabelle:
-
-```bash
-npm run migrate
-```
-
-6. Crea l'utente admin iniziale:
-
-```bash
-npm run seed
-```
-
-7. Avvia:
-
-```bash
-npm start
-```
-
-Poi apri `http://localhost:3000`.
+- `server3.js`: API, autenticazione, autorizzazione, Stripe e server statico;
+- `schema.sql`: schema completo per nuove installazioni;
+- `scripts/migrate.js`: aggiornamento idempotente dei database esistenti;
+- `public/app.js` e `public/app.css`: interfaccia responsive;
+- `public/install-app.js`, `public/sw.js` e `public/manifest.json`: installazione PWA, aggiornamenti e offline;
+- `tests/app.test.js`: test di integrazione con PostgreSQL reale.

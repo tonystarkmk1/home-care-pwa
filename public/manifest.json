@@ -1,65 +1,29 @@
 {
-  "id": "/?app=home-care-v32",
+  "id": "/?app=home-care-v40",
   "name": "Home Care",
   "short_name": "Home Care",
-  "description": "Area clienti e gestionale Home Care per immobili, controlli, report, chat e pagamenti.",
+  "description": "Area clienti e gestionale Home Care per immobili, controlli, report, contatti e pagamenti.",
   "lang": "it-IT",
   "dir": "ltr",
-  "start_url": "/?source=pwa&v=32",
+  "start_url": "/?source=pwa&v=40",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
   "background_color": "#f5f1e8",
-  "theme_color": "#06243a",
+  "theme_color": "#082a3e",
   "categories": ["business", "productivity", "utilities"],
   "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "/icon.svg?v=32",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-192.png?v=32",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-512.png?v=32",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-192.png?v=32",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/icon-512.png?v=32",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "/icon.svg?v=40", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/icon-192.png?v=40", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png?v=40", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png?v=40", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png?v=40", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    {
-      "name": "Chat Home Care",
-      "short_name": "Chat",
-      "description": "Apri la chat Home Care",
-      "url": "/?source=pwa&tab=chat&v=32",
-      "icons": [{ "src": "/icon-192.png?v=32", "sizes": "192x192", "type": "image/png" }]
-    },
-    {
-      "name": "Report controlli",
-      "short_name": "Report",
-      "description": "Apri i report dei controlli",
-      "url": "/?source=pwa&tab=reports&v=32",
-      "icons": [{ "src": "/icon-192.png?v=32", "sizes": "192x192", "type": "image/png" }]
-    }
+    { "name": "Area personale", "short_name": "Home", "url": "/?source=pwa&tab=home&v=40", "icons": [{ "src": "/icon-192.png?v=40", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Chat Home Care", "short_name": "Chat", "url": "/?source=pwa&tab=chat&v=40", "icons": [{ "src": "/icon-192.png?v=40", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Report controlli", "short_name": "Report", "url": "/?source=pwa&tab=reports&v=40", "icons": [{ "src": "/icon-192.png?v=40", "sizes": "192x192", "type": "image/png" }] }
   ]
 }

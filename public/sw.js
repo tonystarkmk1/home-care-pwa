@@ -1,40 +1,34 @@
-const SW_VERSION = 'v18';
-const SHELL_CACHE = `home-care-shell-${SW_VERSION}`;
-const RUNTIME_CACHE = `home-care-runtime-${SW_VERSION}`;
+'use strict';
 
-const CORE_ASSETS = [
+const SW_VERSION = 'home-care-v40';
+const STATIC_CACHE = `${SW_VERSION}-static`;
+const STATIC_ASSETS = [
   '/offline.html',
-  '/manifest.json?v=32',
-  '/icon.svg?v=32',
-  '/icon-192.png?v=32',
-  '/icon-512.png?v=32',
-  '/apple-touch-icon.png?v=32',
-  '/favicon.ico?v=32'
+  '/app.css',
+  '/app.js',
+  '/install-app.js',
+  '/manifest.json?v=40',
+  '/icon.svg?v=40',
+  '/icon-192.png?v=40',
+  '/icon-512.png?v=40',
+  '/apple-touch-icon.png?v=40',
+  '/favicon.ico?v=40',
 ];
 
-const STATIC_EXTENSIONS = /\.(?:css|js|png|jpg|jpeg|webp|svg|ico|json|woff2?)$/i;
-const SENSITIVE_QUERY_KEYS = new Set(['token', 'session_id', 'payment', 'billing', 'portal']);
-
-function isSensitiveUrl(url) {
-  if (url.pathname.startsWith('/api/')) return true;
-  if (url.pathname.startsWith('/uploads/')) return true;
-  for (const key of SENSITIVE_QUERY_KEYS) {
-    if (url.searchParams.has(key)) return true;
-  }
-  return false;
+function isSensitive(url) {
+  return url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/');
 }
 
-function isCacheableStatic(url) {
-  return STATIC_EXTENSIONS.test(url.pathname)
+function isStatic(url) {
+  return /\.(?:css|js|png|jpg|jpeg|webp|svg|ico|json|woff2?)$/i.test(url.pathname)
     || url.pathname === '/offline.html'
     || url.pathname === '/manifest.json';
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE)
-      .then((cache) => cache.addAll(CORE_ASSETS))
-      .catch(() => null)
+    caches.open(STATIC_CACHE)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -42,53 +36,40 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(
-        keys
-          .filter((key) => key.startsWith('home-care-') && ![SHELL_CACHE, RUNTIME_CACHE].includes(key))
-          .map((key) => caches.delete(key))
-      ))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('home-care-') && key !== STATIC_CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
-
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname === '/sw.js') return;
-
-  if (isSensitiveUrl(url)) {
-    if (request.mode === 'navigate') {
-      event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => caches.match('/offline.html')));
-    }
-    return;
-  }
+  if (url.origin !== self.location.origin || url.pathname === '/sw.js') return;
+  if (isSensitive(url)) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request, { cache: 'no-store' })
-        .catch(() => caches.match('/offline.html'))
-    );
+    event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => caches.match('/offline.html')));
     return;
   }
-
-  if (!isCacheableStatic(url)) return;
+  if (!isStatic(url)) return;
 
   event.respondWith(
-    fetch(request, { cache: 'no-store' })
-      .then((response) => {
-        if (response.ok && response.type === 'basic') {
-          const copy = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => null);
-        }
-        return response;
-      })
-      .catch(() => caches.match(request).then((res) => res || caches.match('/offline.html')))
+    caches.match(request).then((cached) => {
+      const network = fetch(request, { cache: 'no-store' })
+        .then((response) => {
+          if (response.ok && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
   );
 });

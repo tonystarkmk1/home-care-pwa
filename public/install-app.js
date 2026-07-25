@@ -1,425 +1,253 @@
 (function () {
-  var APP_VERSION = 'home-care-pwa-v21';
-  var ICON_URL = '/icon-192.png?v=32';
-  var DISMISS_KEY = 'homecare:pwa-install-dismissed';
-  var RELOAD_KEY = 'homecare:sw-controller-reload';
-  var deferredPrompt = window.__homeCarePwaPrompt || null;
-  var mutationObserver = null;
-  var syncTimer = null;
+  'use strict';
 
-  function readLocal(key) { try { return window.localStorage.getItem(key); } catch (_) { return null; } }
-  function writeLocal(key, value) { try { window.localStorage.setItem(key, value); } catch (_) {} }
-  function removeLocal(key) { try { window.localStorage.removeItem(key); } catch (_) {} }
-  function readSession(key) { try { return window.sessionStorage.getItem(key); } catch (_) { return null; } }
-  function writeSession(key, value) { try { window.sessionStorage.setItem(key, value); } catch (_) {} }
+  const APP_VERSION = 'home-care-v40';
+  const standaloneQuery = window.matchMedia('(display-mode: standalone)');
+  const userAgent = navigator.userAgent || '';
+  const isIos = /iphone|ipad|ipod/i.test(userAgent);
+  const isAndroid = /android/i.test(userAgent);
+  const isSamsung = /samsungbrowser/i.test(userAgent);
+  const isEdge = /edg\//i.test(userAgent);
+  const isChrome = /chrome|crios/i.test(userAgent) && !isEdge && !isSamsung;
+  const isSafari = /safari/i.test(userAgent) && !/chrome|crios|android|edg\//i.test(userAgent);
 
-  function getPrompt() {
-    if (!deferredPrompt && window.__homeCarePwaPrompt) deferredPrompt = window.__homeCarePwaPrompt;
-    return deferredPrompt;
-  }
+  let deferredPrompt = null;
+  let waitingWorker = null;
+  let reloading = false;
+  let installInProgress = false;
+  let installHelp = null;
 
   function isStandalone() {
-    var displayStandalone = false;
-    try { displayStandalone = Boolean(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch (_) {}
-    return displayStandalone || window.navigator.standalone === true || /HomeCareAndroid/i.test(window.navigator.userAgent || '');
+    return standaloneQuery.matches || navigator.standalone === true;
   }
 
-  function isIosDevice() {
-    return /iphone|ipad|ipod/i.test(window.navigator.userAgent || '')
-      || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+  function installButtons() {
+    return Array.from(document.querySelectorAll('[data-install-app]'));
   }
 
-  function isSamsungBrowser() { return /SamsungBrowser/i.test(window.navigator.userAgent || ''); }
-  function isEdgeAndroid() { return /EdgA/i.test(window.navigator.userAgent || ''); }
-  function isChromeAndroid() { return /Android/i.test(window.navigator.userAgent || '') && /Chrome/i.test(window.navigator.userAgent || '') && !isEdgeAndroid() && !isSamsungBrowser(); }
-  function isFirefoxAndroid() { return /Android/i.test(window.navigator.userAgent || '') && /Firefox/i.test(window.navigator.userAgent || ''); }
-
-  function isMobileWidth() {
-    try { return Boolean(window.matchMedia && window.matchMedia('(max-width: 860px)').matches); }
-    catch (_) { return false; }
-  }
-
-  function shouldShowInstall() {
-    if (isStandalone() || readLocal(DISMISS_KEY) === APP_VERSION) return false;
-    return Boolean(getPrompt()) || isIosDevice() || isMobileWidth();
-  }
-
-  function appHasContent() {
-    var app = document.getElementById('app');
-    if (!app) return true;
-    return Boolean(app.children.length || String(app.textContent || '').trim());
-  }
-
-  function escapeHtml(value) {
-    return String(value || '').replace(/[&<>]/g, function (match) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[match];
+  function syncInstallButtons() {
+    const visible = !isStandalone();
+    installButtons().forEach((button) => {
+      button.hidden = !visible;
+      button.setAttribute('aria-hidden', visible ? 'false' : 'true');
     });
   }
 
-  function rescueBlankApp(message) {
-    var app = document.getElementById('app');
-    if (!app || appHasContent()) return;
-    if (typeof window.publicHome === 'function') {
-      try { window.publicHome(message || ''); return; } catch (_) {}
-    }
-    app.innerHTML = '<div class="top"><div class="brand">⌂ Home <span>Care</span></div><div><button class="btn light small" id="homecare-rescue-login" type="button">Accedi</button> <button class="btn gold small" id="homecare-rescue-reload" type="button">Ricarica</button></div></div><main class="wrap"><section class="hero"><div><span class="pill">Badesi e località limitrofe</span><h1>Ci prendiamo cura della <span>tua casa</span></h1><p>Controlli periodici, manutenzioni e report fotografici per seconde case, appartamenti e ville. Anche quando sei lontano, hai un referente di fiducia.</p>' + (message ? '<div class="notice">' + escapeHtml(message) + '</div>' : '') + '</div><div class="card"><h2>Come funziona</h2><p>1. Scegli il servizio più adatto.<br>2. Registrati e conferma la mail.<br>3. Inserisci l’immobile da affidare a Home Care.<br>4. Valutiamo la richiesta e pianifichiamo i controlli.</p></div></section></main>';
-    var login = document.getElementById('homecare-rescue-login');
-    var reload = document.getElementById('homecare-rescue-reload');
-    if (login) login.addEventListener('click', function () {
-      if (typeof window.authView === 'function') {
-        try { window.authView('login'); return; } catch (_) {}
-      }
-      window.location.href = '/?login=1&v=' + Date.now();
-    });
-    if (reload) reload.addEventListener('click', function () { window.location.href = '/?v=' + Date.now(); });
-  }
-
-  function toast(message) {
-    var box = document.getElementById('homecare-pwa-toast');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = 'homecare-pwa-toast';
-      box.setAttribute('role', 'status');
-      box.setAttribute('aria-live', 'polite');
-      document.body.appendChild(box);
-    }
-    box.textContent = message;
-    box.classList.add('visible');
-    window.clearTimeout(box._timer);
-    box._timer = window.setTimeout(function () { box.classList.remove('visible'); }, 4200);
-  }
-
-  function ensureStyles() {
-    if (document.getElementById('homecare-pwa-install-styles')) return;
-    var style = document.createElement('style');
-    style.id = 'homecare-pwa-install-styles';
-    style.textContent = [
-      '#homecare-install-banner{position:fixed;left:14px;right:14px;bottom:14px;z-index:999998;display:flex;gap:12px;align-items:center;justify-content:space-between;background:#fffdf7;color:#06243a;border:1px solid #e2d7c8;border-radius:22px;padding:13px;box-shadow:0 18px 46px rgba(6,36,58,.24);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
-      '#homecare-install-banner[hidden]{display:none!important}',
-      '#homecare-install-banner .hc-pwa-copy{display:flex;gap:11px;align-items:center;min-width:0}',
-      '#homecare-install-banner img{width:46px;height:46px;border-radius:14px;flex:0 0 auto}',
-      '#homecare-install-banner strong{display:block;font-weight:1000}',
-      '#homecare-install-banner small{display:block;color:#64748b;line-height:1.25}',
-      '#homecare-install-banner .hc-pwa-actions{display:flex;gap:8px;align-items:center;flex:0 0 auto}',
-      '#homecare-install-banner .hc-pwa-dismiss{border:0;background:transparent;color:#64748b;font-size:24px;line-height:1;cursor:pointer;padding:6px}',
-      '#homecare-pwa-ios-modal[hidden],#homecare-pwa-native-guide-modal[hidden]{display:none!important}',
-      '#homecare-pwa-ios-modal,#homecare-pwa-native-guide-modal{position:fixed;inset:0;z-index:999999;display:grid;place-items:center;padding:18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
-      '#homecare-pwa-ios-modal .hc-pwa-backdrop,#homecare-pwa-native-guide-modal .hc-pwa-backdrop{position:absolute;inset:0;background:rgba(6,36,58,.55)}',
-      '#homecare-pwa-ios-modal .hc-pwa-card,#homecare-pwa-native-guide-modal .hc-pwa-card{position:relative;max-width:450px;width:100%;background:#fffdf7;color:#06243a;border-radius:28px;padding:24px;border:1px solid #e2d7c8;box-shadow:0 24px 70px rgba(0,0,0,.32)}',
-      '#homecare-pwa-ios-modal img,#homecare-pwa-native-guide-modal img{width:66px;height:66px;border-radius:18px}',
-      '#homecare-pwa-ios-modal h2,#homecare-pwa-native-guide-modal h2{margin:12px 0 8px}',
-      '#homecare-pwa-ios-modal ol,#homecare-pwa-native-guide-modal ol{line-height:1.65;padding-left:22px}',
-      '#homecare-pwa-ios-modal .hc-pwa-close,#homecare-pwa-native-guide-modal .hc-pwa-close{position:absolute;right:12px;top:10px;border:0;background:transparent;font-size:28px;cursor:pointer;color:#64748b}',
-      '#homecare-pwa-native-guide-modal .hc-pwa-note{background:#fff8e8;border-left:5px solid #c7952d;border-radius:14px;padding:10px 12px;margin:12px 0;color:#06243a}',
-      '#homecare-pwa-toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(14px);z-index:1000000;background:#06243a;color:white;border-radius:999px;padding:11px 15px;font-weight:900;box-shadow:0 14px 32px rgba(6,36,58,.28);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;max-width:min(92vw,520px);text-align:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}',
-      '#homecare-pwa-toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}',
-      '@media(max-width:560px){#homecare-install-banner{align-items:stretch;flex-direction:column;left:12px;right:12px;bottom:12px;padding:14px}.hc-pwa-actions{width:100%}#homecare-install-banner .btn{flex:1;width:100%;font-size:16px;padding:13px 16px}.hc-pwa-dismiss{position:absolute;right:12px;top:12px}.hc-pwa-copy{padding-right:34px}}'
-    ].join('\n');
-    document.head.appendChild(style);
-  }
-
-  function makeButton(label) {
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'btn light small hc-install-direct';
-    button.textContent = label || 'Installa app';
-    button.setAttribute('data-pwa-manual-install', 'true');
-    button.addEventListener('click', requestInstall);
-    return button;
-  }
-
-  function bindExistingInstallButtons(root) {
-    var buttons = (root || document).querySelectorAll('.hc-install-direct,[data-pwa-manual-install],[data-install-app]');
-    Array.prototype.forEach.call(buttons, function (button) {
-      if (button.getAttribute('data-pwa-bound') !== 'true') {
-        button.removeAttribute('onclick');
-        button.setAttribute('data-pwa-bound', 'true');
-        button.addEventListener('click', requestInstall);
-      }
-      if (!String(button.textContent || '').trim()) button.textContent = 'Installa app';
-      button.hidden = !shouldShowInstall();
-    });
-  }
-
-  function ensureHeaderButton() {
-    var top = document.querySelector('.top');
-    if (!top || !shouldShowInstall()) return;
-    bindExistingInstallButtons(top);
-    if (top.querySelector('#homecare-install-header,.hc-install-direct,[data-pwa-manual-install]')) return;
-    var target = top.children && top.children.length ? top.children[top.children.length - 1] : top;
-    if (!target) return;
-    var button = makeButton('Installa app');
-    button.id = 'homecare-install-header';
-    button.style.marginRight = '8px';
-    target.insertBefore(button, target.firstChild || null);
-  }
-
-  function ensureBanner() {
-    if (document.getElementById('homecare-install-banner')) return;
-    var banner = document.createElement('aside');
-    banner.id = 'homecare-install-banner';
-    banner.setAttribute('aria-live', 'polite');
-    banner.hidden = true;
-    banner.innerHTML = '<div class="hc-pwa-copy"><img src="' + ICON_URL + '" alt=""><span><strong>Installa Home Care</strong><small id="homecare-install-message">Aggiungila al dispositivo e aprila come una vera app.</small></span></div><div class="hc-pwa-actions"><button id="homecare-install-action" class="btn gold small" type="button">Installa app</button><button id="homecare-install-dismiss" class="hc-pwa-dismiss" type="button" aria-label="Chiudi suggerimento installazione">×</button></div>';
-    document.body.appendChild(banner);
-    document.getElementById('homecare-install-action').addEventListener('click', requestInstall);
-    document.getElementById('homecare-install-dismiss').addEventListener('click', function () {
-      writeLocal(DISMISS_KEY, APP_VERSION);
-      syncInstallUi();
-    });
-  }
-
-  function bindModalClose(modal, setter) {
-    var closers = modal.querySelectorAll('[data-pwa-close]');
-    Array.prototype.forEach.call(closers, function (element) {
-      element.addEventListener('click', function () { setter(false); });
-    });
-  }
-
-  function ensureIosModal() {
-    if (document.getElementById('homecare-pwa-ios-modal')) return;
-    var modal = document.createElement('div');
-    modal.id = 'homecare-pwa-ios-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', 'homecare-pwa-ios-title');
-    modal.hidden = true;
-    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="' + ICON_URL + '" alt="Home Care"><h2 id="homecare-pwa-ios-title">Aggiungi Home Care alla schermata Home</h2><ol><li>Tocca il pulsante <strong>Condividi</strong> di Safari.</li><li>Seleziona <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma con <strong>Aggiungi</strong>.</li></ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
-    document.body.appendChild(modal);
-    bindModalClose(modal, setIosModal);
-  }
-
-  function nativeInstallGuideContent() {
-    if (isSamsungBrowser()) {
+  function installationInstructions() {
+    if (isIos) {
       return {
-        title: 'Usa il comando Installa app',
-        note: 'Se la conferma automatica non compare, Samsung Internet usa il comando nativo dal menu del browser.',
-        steps: '<li>Tocca il menu <strong>☰ Menu</strong> oppure <strong>⋮</strong> in basso.</li><li>Cerca e tocca <strong>Installa app</strong>. Se non lo vedi, scegli <strong>Aggiungi pagina a</strong>.</li><li>Seleziona <strong>Schermata Home</strong> e conferma con <strong>Aggiungi</strong>.</li>'
+        title: 'Installa Home Care su iPhone o iPad',
+        steps: [
+          'Apri Home Care con Safari.',
+          'Tocca Condividi, il quadrato con la freccia verso l’alto.',
+          'Scorri e scegli “Aggiungi alla schermata Home”.',
+          'Conferma con “Aggiungi”.',
+        ],
+        note: 'iOS non consente al sito di aprire automaticamente il comando. Dopo l’installazione Home Care si avvierà come un’app.',
       };
     }
-    if (isChromeAndroid()) {
+    if (isSamsung) {
       return {
-        title: 'Usa il comando Installa app',
-        note: 'Chrome può mostrare la conferma automatica. Se non parte, usa il comando nativo del menu.',
-        steps: '<li>Tocca il menu <strong>⋮</strong> in alto a destra.</li><li>Tocca <strong>Installa app</strong>.</li><li>Conferma con <strong>Installa</strong>.</li>'
+        title: 'Installa con Samsung Internet',
+        steps: [
+          'Apri il menu del browser.',
+          'Scegli “Aggiungi pagina a”.',
+          'Seleziona “Schermata Home” e conferma.',
+        ],
+        note: 'Il nome del comando può cambiare leggermente in base alla versione del telefono.',
       };
     }
-    if (isEdgeAndroid()) {
+    if (isAndroid) {
       return {
-        title: 'Usa il comando Installa app',
-        note: 'Microsoft Edge può installare Home Care dal menu del browser.',
-        steps: '<li>Tocca il menu <strong>⋮</strong>.</li><li>Tocca <strong>Installa app</strong> o <strong>Aggiungi al telefono</strong>.</li><li>Conferma l’installazione.</li>'
+        title: 'Installa Home Care su Android',
+        steps: [
+          'Apri il menu del browser con i tre puntini.',
+          'Scegli “Installa app” oppure “Aggiungi alla schermata Home”.',
+          'Conferma l’installazione.',
+        ],
+        note: 'In Chrome può comparire anche l’icona di installazione nella barra degli indirizzi.',
       };
     }
-    if (isFirefoxAndroid()) {
+    if (isSafari) {
       return {
-        title: 'Aggiungi Home Care alla schermata Home',
-        note: 'Firefox Android usa il comando del menu per aggiungere il sito alla schermata Home.',
-        steps: '<li>Tocca il menu <strong>⋮</strong>.</li><li>Scegli <strong>Installa</strong> oppure <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma l’aggiunta.</li>'
+        title: 'Installa Home Care con Safari',
+        steps: [
+          'Apri il menu File di Safari.',
+          'Scegli “Aggiungi al Dock”, quando disponibile.',
+          'Conferma il nome dell’app.',
+        ],
+        note: 'Nelle versioni precedenti di macOS puoi creare un collegamento dal menu Condividi.',
+      };
+    }
+    if (isEdge) {
+      return {
+        title: 'Installa Home Care con Microsoft Edge',
+        steps: [
+          'Apri il menu con i tre puntini.',
+          'Scegli App, quindi “Installa Home Care”.',
+          'Conferma l’installazione.',
+        ],
+        note: 'Può comparire anche l’icona App disponibile nella barra degli indirizzi.',
+      };
+    }
+    if (isChrome) {
+      return {
+        title: 'Installa Home Care con Chrome',
+        steps: [
+          'Cerca l’icona di installazione nella barra degli indirizzi.',
+          'Oppure apri il menu con i tre puntini e scegli “Installa app”.',
+          'Conferma l’installazione.',
+        ],
+        note: 'Dopo l’installazione Home Care si aprirà in una finestra separata.',
       };
     }
     return {
-      title: 'Usa il comando nativo Installa app',
-      note: 'Il browser non ha aperto la conferma automatica. Puoi installare Home Care dal menu del browser.',
-      steps: '<li>Apri il menu del browser.</li><li>Cerca <strong>Installa app</strong> oppure <strong>Aggiungi alla schermata Home</strong>.</li><li>Conferma l’installazione o l’aggiunta.</li>'
+      title: 'Installa Home Care',
+      steps: [
+        'Apri il menu del browser.',
+        'Cerca “Installa app” oppure “Aggiungi alla schermata Home”.',
+        'Conferma l’installazione.',
+      ],
+      note: 'Quando il browser supporta il prompt nativo, il pulsante apre direttamente la conferma.',
     };
   }
 
-  function ensureNativeGuideModal() {
-    if (document.getElementById('homecare-pwa-native-guide-modal')) return;
-    var content = nativeInstallGuideContent();
-    var modal = document.createElement('div');
-    modal.id = 'homecare-pwa-native-guide-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', 'homecare-pwa-native-guide-title');
-    modal.hidden = true;
-    modal.innerHTML = '<div class="hc-pwa-backdrop" data-pwa-close></div><section class="hc-pwa-card"><button class="hc-pwa-close" type="button" data-pwa-close aria-label="Chiudi">×</button><img src="' + ICON_URL + '" alt="Home Care"><h2 id="homecare-pwa-native-guide-title">' + content.title + '</h2><div class="hc-pwa-note">' + content.note + '</div><ol>' + content.steps + '</ol><button class="btn full" type="button" data-pwa-close>Ho capito</button></section>';
-    document.body.appendChild(modal);
-    bindModalClose(modal, setNativeGuideModal);
-  }
-
-  function setIosModal(open) {
-    ensureIosModal();
-    var modal = document.getElementById('homecare-pwa-ios-modal');
-    if (!modal) return;
-    modal.hidden = !open;
-    document.body.style.overflow = open ? 'hidden' : '';
-  }
-
-  function setNativeGuideModal(open) {
-    ensureNativeGuideModal();
-    var modal = document.getElementById('homecare-pwa-native-guide-modal');
-    if (!modal) return;
-    modal.hidden = !open;
-    document.body.style.overflow = open ? 'hidden' : '';
-  }
-
-  function hideInstallUi() {
-    var buttons = document.querySelectorAll('#homecare-install-header,#homecare-install-floating,.hc-install-direct,[data-pwa-manual-install]');
-    Array.prototype.forEach.call(buttons, function (button) { button.hidden = true; });
-    var banner = document.getElementById('homecare-install-banner');
-    if (banner) banner.hidden = true;
-  }
-
-  function syncInstallUi() {
-    if (!document.body) return;
-    ensureStyles();
-    if (!appHasContent()) rescueBlankApp();
-    bindExistingInstallButtons(document);
-    if (!shouldShowInstall()) {
-      hideInstallUi();
-      return;
-    }
-
-    ensureHeaderButton();
-    ensureBanner();
-    ensureIosModal();
-    ensureNativeGuideModal();
-    bindExistingInstallButtons(document);
-
-    var buttons = document.querySelectorAll('#homecare-install-header,.hc-install-direct,[data-pwa-manual-install]');
-    Array.prototype.forEach.call(buttons, function (button) {
-      button.hidden = false;
-      if (button.id === 'homecare-install-header') button.textContent = 'Installa app';
+  function ensureInstallHelp() {
+    if (installHelp) return installHelp;
+    const instructions = installationInstructions();
+    const overlay = document.createElement('div');
+    overlay.className = 'install-help';
+    overlay.hidden = true;
+    overlay.innerHTML = `
+      <section class="install-help-card" role="dialog" aria-modal="true" aria-labelledby="installHelpTitle">
+        <button class="button light icon compact install-help-close" type="button" data-install-help-close aria-label="Chiudi">×</button>
+        <div class="install-help-logo" aria-hidden="true">HC</div>
+        <h2 id="installHelpTitle"></h2>
+        <ol data-install-help-steps></ol>
+        <p class="install-help-note" data-install-help-note></p>
+        <button class="button primary block" type="button" data-install-help-close>Ho capito</button>
+      </section>`;
+    overlay.querySelector('h2').textContent = instructions.title;
+    const list = overlay.querySelector('[data-install-help-steps]');
+    instructions.steps.forEach((step) => {
+      const item = document.createElement('li');
+      item.textContent = step;
+      list.appendChild(item);
     });
+    overlay.querySelector('[data-install-help-note]').textContent = instructions.note;
 
-    var banner = document.getElementById('homecare-install-banner');
-    var message = document.getElementById('homecare-install-message');
-    var action = document.getElementById('homecare-install-action');
-    var canPrompt = Boolean(getPrompt());
-
-    if (banner) banner.hidden = false;
-    if (message) {
-      if (canPrompt) message.textContent = 'Tocca Installa app: si aprirà la conferma nativa del browser.';
-      else if (isIosDevice()) message.textContent = 'Su iPhone si installa da Safari: Condividi → Aggiungi alla schermata Home.';
-      else message.textContent = 'Tocca Installa app: ti mostro il comando nativo da usare nel browser.';
+    function close() {
+      overlay.classList.remove('open');
+      document.body.classList.remove('install-help-open');
+      window.setTimeout(() => { overlay.hidden = true; }, 220);
     }
-    if (action) action.textContent = 'Installa app';
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay || event.target.closest('[data-install-help-close]')) close();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !overlay.hidden) close();
+    });
+    document.body.appendChild(overlay);
+    installHelp = { overlay, close };
+    return installHelp;
   }
 
-  function scheduleSync() {
-    window.clearTimeout(syncTimer);
-    syncTimer = window.setTimeout(syncInstallUi, 80);
+  function openInstallHelp() {
+    const help = ensureInstallHelp();
+    help.overlay.hidden = false;
+    document.body.classList.add('install-help-open');
+    window.requestAnimationFrame(() => {
+      help.overlay.classList.add('open');
+      help.overlay.querySelector('[data-install-help-close]')?.focus({ preventScroll: true });
+    });
   }
 
-  function requestInstall() {
-    removeLocal(DISMISS_KEY);
-    if (isStandalone()) {
-      toast('Home Care è già installata su questo dispositivo.');
-      syncInstallUi();
+  async function requestInstallation() {
+    if (installInProgress || isStandalone()) return;
+    if (!deferredPrompt) {
+      openInstallHelp();
       return;
     }
-
-    var promptEvent = getPrompt();
-    if (promptEvent) {
+    installInProgress = true;
+    try {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
       deferredPrompt = null;
-      window.__homeCarePwaPrompt = null;
-      try {
-        Promise.resolve(promptEvent.prompt()).then(function () {
-          return promptEvent.userChoice ? promptEvent.userChoice : { outcome: 'unknown' };
-        }).then(function (choice) {
-          if (choice && choice.outcome === 'accepted') {
-            toast('Installazione Home Care avviata.');
-            hideInstallUi();
-          } else {
-            toast('Installazione annullata. Puoi riprovare dal pulsante Installa app.');
-          }
-          syncInstallUi();
-        }).catch(function () {
-          setNativeGuideModal(true);
-          syncInstallUi();
-        });
-      } catch (_) {
-        setNativeGuideModal(true);
-        syncInstallUi();
-      }
-      return;
+      if (choice?.outcome === 'accepted') syncInstallButtons();
+    } catch (_) {
+      deferredPrompt = null;
+      openInstallHelp();
+    } finally {
+      installInProgress = false;
     }
-
-    if (isIosDevice()) {
-      setIosModal(true);
-      return;
-    }
-    setNativeGuideModal(true);
   }
 
-  function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-    if (window.location.protocol !== 'https:' && ['localhost', '127.0.0.1', '[::1]'].indexOf(window.location.hostname) === -1) return;
-    navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (readSession(RELOAD_KEY) === APP_VERSION) return;
-      writeSession(RELOAD_KEY, APP_VERSION);
-      window.location.reload();
-    });
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function (registration) {
-      if (registration && registration.update) registration.update().catch(function () {});
-    }).catch(function () {});
-  }
+  document.addEventListener('click', (event) => {
+    const installButton = event.target.closest('[data-install-app]');
+    if (!installButton) return;
+    event.preventDefault();
+    requestInstallation();
+  });
 
-  function startObserver() {
-    if (mutationObserver || !document.body || !('MutationObserver' in window)) return;
-    mutationObserver = new MutationObserver(scheduleSync);
-    mutationObserver.observe(document.body, { childList: true, subtree: true });
-  }
-
-  function init() {
-    ensureStyles();
-    window.setTimeout(function () { if (!appHasContent()) rescueBlankApp(); }, 250);
-    window.setTimeout(function () { if (!appHasContent()) rescueBlankApp(); }, 900);
-    window.setTimeout(function () { if (!appHasContent()) rescueBlankApp(); }, 2200);
-    registerServiceWorker();
-    syncInstallUi();
-    startObserver();
-  }
-
-  window.addEventListener('beforeinstallprompt', function (event) {
+  window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     deferredPrompt = event;
-    window.__homeCarePwaPrompt = event;
-    syncInstallUi();
+    syncInstallButtons();
   });
 
-  window.addEventListener('homecarebeforeinstallprompt', function () {
-    if (window.__homeCarePwaPrompt) deferredPrompt = window.__homeCarePwaPrompt;
-    syncInstallUi();
-  });
-
-  window.addEventListener('appinstalled', function () {
+  window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
-    window.__homeCarePwaPrompt = null;
-    removeLocal(DISMISS_KEY);
-    hideInstallUi();
-    toast('Home Care è stata installata.');
+    syncInstallButtons();
+    installHelp?.close();
   });
 
-  window.addEventListener('error', function () {
-    window.setTimeout(function () { if (!appHasContent()) rescueBlankApp('Ho corretto un caricamento incompleto della pagina.'); }, 100);
+  if (typeof standaloneQuery.addEventListener === 'function') standaloneQuery.addEventListener('change', syncInstallButtons);
+  else if (typeof standaloneQuery.addListener === 'function') standaloneQuery.addListener(syncInstallButtons);
+
+  const observer = new MutationObserver(syncInstallButtons);
+  observer.observe(document.getElementById('app') || document.body, { childList: true, subtree: true });
+  syncInstallButtons();
+
+  function updateConnectionState() {
+    const banner = document.getElementById('offlineBanner');
+    if (banner) banner.hidden = navigator.onLine;
+  }
+  window.addEventListener('online', updateConnectionState);
+  window.addEventListener('offline', updateConnectionState);
+  updateConnectionState();
+
+  function showUpdate(worker) {
+    waitingWorker = worker;
+    const card = document.getElementById('updateCard');
+    if (card) card.hidden = false;
+  }
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-apply-update]')) return;
+    if (waitingWorker) waitingWorker.postMessage({ type: 'SKIP_WAITING' });
   });
 
-  window.addEventListener('unhandledrejection', function () {
-    window.setTimeout(function () { if (!appHasContent()) rescueBlankApp('Ho corretto un caricamento incompleto della pagina.'); }, 100);
-  });
-
-  window.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') {
-      setIosModal(false);
-      setNativeGuideModal(false);
-    }
-  });
-
-  window.addEventListener('focus', syncInstallUi);
-  window.addEventListener('resize', syncInstallUi);
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') syncInstallUi();
-  });
-
-  window.HomeCarePwaInstall = {
-    request: requestInstall,
-    sync: syncInstallUi,
-    rescueBlankApp: rescueBlankApp
-  };
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`, { scope: '/' })
+        .then((registration) => {
+          registration.update().catch(() => {});
+          if (registration.waiting && navigator.serviceWorker.controller) showUpdate(registration.waiting);
+          registration.addEventListener('updatefound', () => {
+            const worker = registration.installing;
+            if (!worker) return;
+            worker.addEventListener('statechange', () => {
+              if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdate(worker);
+            });
+          });
+        })
+        .catch(() => {});
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+  }
+}());
